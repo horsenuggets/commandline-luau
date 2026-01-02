@@ -1,0 +1,14 @@
+{
+    "name": "commandline-luau",
+    "tree": {
+        "$className": "Folder",
+        "Source": {
+            "$className": "Folder",
+            "$path": "Source"
+        },
+        "Packages": {
+            "$className": "Folder",
+            "$path": "Packages"
+        }
+    }
+}
