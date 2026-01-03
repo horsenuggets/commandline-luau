@@ -29,7 +29,7 @@ export type Command = {
     _args: { Arg.Arg },
     _flags: { Flag.Flag },
     _helpMessage: string,
-    _impl: (args: { any }) -> any,
+    _impl: ((args: { [string]: any }, flags: { [string]: { Value: any? } }) -> any)?,
     _subcommands: { Command },
 
     -- Public methods
@@ -67,7 +67,7 @@ export type CommandlineOptions = {
     Args: { any }?,
     Flags: { any }?,
     Subcommands: { any }?,
-    Impl: (() -> ())?,
+    Impl: ((args: { [string]: any }, flags: { [string]: { Value: any? } }) -> any)?,
 }
 
 local ICommandlineOptions = t.strictInterface({
