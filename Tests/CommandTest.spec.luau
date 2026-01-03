@@ -152,11 +152,11 @@ return function()
 		end)
 
 		it("should create Command with Impl function", function()
-			local executed = false
+			local _executed = false
 			local cmd = Command.new({
 				Name = "test",
 				Impl = function()
-					executed = true
+					_executed = true
 				end,
 			})
 			expect(cmd._impl).to.be.ok()
