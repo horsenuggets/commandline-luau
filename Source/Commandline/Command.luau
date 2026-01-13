@@ -53,10 +53,7 @@ export type Command = {
         parsedFlags: { [string]: { Value: any? } },
         isShorthand: boolean
     ) -> (number?, string?),
-    _parsePositionalArgs: (
-        self: Command,
-        positionalArgs: { string }
-    ) -> ({ [string]: any }?, string?),
+    _parsePositionalArgs: (self: Command, positionalArgs: { string }) -> ({ [string]: any }?, string?),
     _printError: (self: Command, message: string) -> (),
 }
 export type CommandlineOptions = {
