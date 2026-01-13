@@ -1,4 +1,4 @@
-local Testable = require("@packages/Testable")
+local Testable = require("@devpackages/Testable")
 local process = require("@lune/process")
 
 local TESTS = {

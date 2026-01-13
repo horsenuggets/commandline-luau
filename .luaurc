@@ -1,7 +1,8 @@
 {
     "aliases": {
         "lune": "~/.lune/.typedefs/0.10.4+horse.0.2/",
-        "packages": "./Packages/"
+        "packages": "./Packages/",
+        "devpackages": "./DevPackages/"
     },
     "globals": [
         "afterEach",
