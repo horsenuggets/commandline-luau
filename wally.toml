@@ -10,4 +10,6 @@ repository = "https://github.com/horsenuggets/commandline-luau"
 [dependencies]
 Chalk = "horsenuggets/chalk-luau@0.0.0"
 t = "horsenuggets/t@3.1.1-horse.0.3"
-Testable = "horsenuggets/testable@0.0.0"
+
+[dev-dependencies]
+Testable = "horsenuggets/testable@0.0.5"

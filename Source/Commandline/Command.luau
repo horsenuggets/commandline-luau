@@ -41,11 +41,10 @@ export type Command = {
     _findFlagByShorthand: (self: Command, shorthand: string) -> Flag.Flag?,
     _initializeFlagDefaults: (self: Command) -> { [string]: { Value: any? } },
     _makeHelpMessage: (self: Command) -> string,
-    _parseArgsAndFlags: (self: Command, tokens: { string }) -> (
-        { string },
-        { [string]: { Value: any? } },
-        string?
-    ),
+    _parseArgsAndFlags: (
+        self: Command,
+        tokens: { string }
+    ) -> ({ string }, { [string]: { Value: any? } }, string?),
     _parseFlag: (
         self: Command,
         arg: string,
@@ -54,10 +53,7 @@ export type Command = {
         parsedFlags: { [string]: { Value: any? } },
         isShorthand: boolean
     ) -> (number?, string?),
-    _parsePositionalArgs: (self: Command, positionalArgs: { string }) -> (
-        { [string]: any }?,
-        string?
-    ),
+    _parsePositionalArgs: (self: Command, positionalArgs: { string }) -> ({ [string]: any }?, string?),
     _printError: (self: Command, message: string) -> (),
 }
 export type CommandlineOptions = {
@@ -85,10 +81,7 @@ local Command = {}
 Command.__index = Command
 
 function Command.new(commandlineOptions: CommandlineOptions): Command
-    assert(
-        ICommandlineOptions(commandlineOptions),
-        "Invalid commandline options provided."
-    )
+    assert(ICommandlineOptions(commandlineOptions), "Invalid commandline options provided.")
 
     local self = setmetatable({}, Command)
     self.Name = commandlineOptions.Name:lower()
@@ -123,10 +116,7 @@ function Command.new(commandlineOptions: CommandlineOptions): Command
 
     -- Validate all elements are correct types
     for _, subcommand in self._subcommands do
-        assert(
-            getmetatable(subcommand) == Command,
-            "All Subcommands must be instances of Command."
-        )
+        assert(getmetatable(subcommand) == Command, "All Subcommands must be instances of Command.")
     end
     for _, arg in self._args do
         assert(getmetatable(arg) == Arg, "All Args must be instances of Arg.")
@@ -160,10 +150,7 @@ function Command.new(commandlineOptions: CommandlineOptions): Command
     -- Validate uniqueness of subcommand names
     local subcommandNames = {}
     for _, subcommand in self._subcommands do
-        assert(
-            not subcommandNames[subcommand.Name],
-            `Duplicate subcommand name "{subcommand.Name}".`
-        )
+        assert(not subcommandNames[subcommand.Name], `Duplicate subcommand name "{subcommand.Name}".`)
         subcommandNames[subcommand.Name] = true
     end
 
@@ -171,10 +158,7 @@ function Command.new(commandlineOptions: CommandlineOptions): Command
     if #self._subcommands > 0 then
         assert(#self._args == 0, "Cannot have Args when Subcommands are present.")
         -- Only the auto-generated help Flag is allowed
-        assert(
-            #self._flags == 1 and self._flags[1].Name == "help",
-            "Cannot have Flags when Subcommands are present."
-        )
+        assert(#self._flags == 1 and self._flags[1].Name == "help", "Cannot have Flags when Subcommands are present.")
         assert(self._impl == nil, "Cannot have Impl when Subcommands are present.")
     end
 
@@ -370,13 +354,7 @@ function Command._initializeFlagDefaults(self: Command): { [string]: { Value: an
     return parsedFlags
 end
 
-function Command._parsePositionalArgs(
-    self: Command,
-    positionalArgs: { string }
-): (
-    { [string]: any }?,
-    string?
-)
+function Command._parsePositionalArgs(self: Command, positionalArgs: { string }): ({ [string]: any }?, string?)
     local parsedArgs = {}
 
     -- Count required Args
@@ -416,11 +394,7 @@ end
 function Command._parseArgsAndFlags(
     self: Command,
     tokens: { string }
-): (
-    { string },
-    { [string]: { Value: any? } },
-    string?
-)
+): ({ string }, { [string]: { Value: any? } }, string?)
     local parsedFlags = self:_initializeFlagDefaults()
     local positionalArgs = {}
 

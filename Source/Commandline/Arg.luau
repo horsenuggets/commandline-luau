@@ -45,30 +45,23 @@ function Arg.new(argOptions: ArgOptions)
     self.Name = argOptions.Name
     self.Description = argOptions.Description or "No description."
     self.Type = argOptions.Type or "string"
-    self.Required = if argOptions.Required ~= nil
-        then argOptions.Required
-        else true
+    self.Required = if argOptions.Required ~= nil then argOptions.Required else true
     self.Default = argOptions.Default
 
     -- Validate type is valid
     assert(
         TypeUtils.isValidType(self.Type),
-        `Invalid type "{self.Type}". Must be one of: boolean, int, number, ` ..
-            `string.`
+        `Invalid type "{self.Type}". Must be one of: boolean, int, number, ` .. `string.`
     )
 
     -- If a default value is provided, the Arg cannot be required
     if self.Default ~= nil then
-        assert(
-            not self.Required,
-            "Cannot have a default value for a required Arg."
-        )
+        assert(not self.Required, "Cannot have a default value for a required Arg.")
 
         -- Validate that the default value matches the type
         assert(
             TypeUtils.validateValueType(self.Default, self.Type),
-            `Default value for Arg "{self.Name}" does not match type ` ..
-                `"{self.Type}".`
+            `Default value for Arg "{self.Name}" does not match type ` .. `"{self.Type}".`
         )
     end
 
