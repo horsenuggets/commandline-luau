@@ -27,10 +27,7 @@ end
 
 -- Asserts that a string is alphanumeric and lowercase, throwing an error if not.
 function StringUtils.assertAlphanumericLowercase(str: string, fieldName: string): string
-    assert(
-        StringUtils.isAlphanumericLowercase(str),
-        `{fieldName} must be alphanumeric and lowercase, got "{str}".`
-    )
+    assert(StringUtils.isAlphanumericLowercase(str), `{fieldName} must be alphanumeric and lowercase, got "{str}".`)
     return str
 end
 

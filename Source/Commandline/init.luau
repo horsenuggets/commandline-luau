@@ -25,49 +25,40 @@ local Commandline = {
 }
 
 function Commandline.registerCommand(command: Command.Command)
-    assert(
-        t.table(command) and getmetatable(command) == Command,
-        "Invalid command provided."
-    )
-    assert(
-        not Commandline._commands[command.Name],
-        "Command with this name already registered."
-    )
+    assert(t.table(command) and getmetatable(command) == Command, "Invalid command provided.")
+    assert(not Commandline._commands[command.Name], "Command with this name already registered.")
 
     Commandline._commands[command.Name] = command
 end
 
 function Commandline.execute(rawCommandString: string)
-	assert(t.string(rawCommandString), "Invalid command string provided.")
+    assert(t.string(rawCommandString), "Invalid command string provided.")
 
-	-- Tokenize the command string, respecting quotes and escapes
-	local tokens, tokenizeErr = StringUtils.tokenize(rawCommandString)
-	if tokenizeErr then
-		error(tokenizeErr)
-	end
+    -- Tokenize the command string, respecting quotes and escapes
+    local tokens, tokenizeErr = StringUtils.tokenize(rawCommandString)
+    if tokenizeErr then
+        error(tokenizeErr)
+    end
 
-	-- Check if we have at least one token (the command name)
-	if #tokens == 0 then
-		error("No command provided.")
-	end
+    -- Check if we have at least one token (the command name)
+    if #tokens == 0 then
+        error("No command provided.")
+    end
 
-	-- Extract command name
-	local commandName = StringUtils.assertAlphanumericLowercase(
-		tokens[1],
-		"Command name"
-	)
+    -- Extract command name
+    local commandName = StringUtils.assertAlphanumericLowercase(tokens[1], "Command name")
 
-	-- Find the registered command first to get Flag definitions
-	local command = Commandline._commands[commandName]
-	if not command then
-		error(`Unknown command "{commandName}".`)
-	end
+    -- Find the registered command first to get Flag definitions
+    local command = Commandline._commands[commandName]
+    if not command then
+        error(`Unknown command "{commandName}".`)
+    end
 
-	local remainingTokens = {}
-	for i = 2, #tokens do
-		table.insert(remainingTokens, tokens[i])
-	end
-	command:Execute(table.freeze(remainingTokens))
+    local remainingTokens = {}
+    for i = 2, #tokens do
+        table.insert(remainingTokens, tokens[i])
+    end
+    command:Execute(table.freeze(remainingTokens))
 end
 
 return Commandline
