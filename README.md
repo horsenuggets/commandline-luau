@@ -2,15 +2,6 @@
 
 A CLI builder for Luau.
 
-## Installation
-
-Add to your `wally.toml`:
-
-```toml
-[dependencies]
-Commandline = "horsenuggets/commandline-luau@0.0.1"
-```
-
 ## Basic Usage
 
 ```luau
