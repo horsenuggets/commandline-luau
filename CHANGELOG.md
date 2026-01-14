@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.0.2
+
+- Use `@self` alias in require path for better Wally compatibility
+- Add `include`/`exclude` fields to wally.toml for cleaner package distribution
+
 ## 0.0.1
 
 Initial release of the commandline-luau library.
