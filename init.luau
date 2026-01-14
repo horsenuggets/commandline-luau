@@ -1,1 +1,1 @@
-return require("./commandline-luau/Source/Command")
+return require("@self/Source/Commandline")
