@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.3
+
+- Add `Source/**` glob pattern to wally.toml include for nested file support
+
 ## 0.0.2
 
 - Use `@self` alias in require path for better Wally compatibility
