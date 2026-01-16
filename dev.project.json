@@ -1,0 +1,12 @@
+{
+    "name": "commandline-luau",
+    "tree": {
+        "$path": "Source/Commandline",
+        "DevPackages": {
+            "$path": "DevPackages"
+        },
+        "Packages": {
+            "$path": "Packages"
+        }
+    }
+}
