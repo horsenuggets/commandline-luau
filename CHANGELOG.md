@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.7
+
+- Fix chalk-luau dependency version to 0.0.1
+
 ## 0.0.6
 
 - Fix Wally package to include kebab-case support
