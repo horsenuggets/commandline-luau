@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.6
+
+- Fix Wally package to include kebab-case support
+
 ## 0.0.5
 
 - (Re-release) Support kebab-case names for commands, flags, and args
