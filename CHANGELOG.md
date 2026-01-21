@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.5
+
+- (Re-release) Support kebab-case names for commands, flags, and args
+
 ## 0.0.4
 
 - Support kebab-case names for commands, flags, and args (single hyphens between words)
