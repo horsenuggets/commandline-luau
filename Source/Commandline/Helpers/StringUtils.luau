@@ -17,17 +17,30 @@ function StringUtils.capitalizeFirstLetter(str: string): string
     return `{str:sub(1, 1):upper()}{str:sub(2)}`
 end
 
--- Checks if a string contains only lowercase alphanumeric characters (a-z, 0-9).
+-- Checks if a string is valid kebab-case (lowercase alphanumeric with single hyphens between words).
+-- Rules: no leading/trailing hyphens, no consecutive hyphens, only a-z, 0-9, and single hyphens.
 function StringUtils.isAlphanumericLowercase(str: string): boolean
     if #str == 0 then
         return false
     end
-    return str:match("^[a-z0-9]+$") ~= nil
+    -- Must start and end with alphanumeric (not hyphen)
+    if str:sub(1, 1) == "-" or str:sub(-1) == "-" then
+        return false
+    end
+    -- Must not contain consecutive hyphens
+    if str:find("%-%-") then
+        return false
+    end
+    -- Must only contain lowercase alphanumeric and single hyphens
+    return str:match("^[a-z0-9%-]+$") ~= nil
 end
 
--- Asserts that a string is alphanumeric and lowercase, throwing an error if not.
+-- Asserts that a string is valid kebab-case, throwing an error if not.
 function StringUtils.assertAlphanumericLowercase(str: string, fieldName: string): string
-    assert(StringUtils.isAlphanumericLowercase(str), `{fieldName} must be alphanumeric and lowercase, got "{str}".`)
+    assert(
+        StringUtils.isAlphanumericLowercase(str),
+        `{fieldName} must be kebab-case (lowercase alphanumeric, single hyphens between words), got "{str}".`
+    )
     return str
 end
 

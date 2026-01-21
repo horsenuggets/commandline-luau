@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.0.4
+
+- Support kebab-case names for commands, flags, and args (single hyphens between words)
+- Validate against leading/trailing hyphens and consecutive hyphens
+
 ## 0.0.3
 
 - Add `Source/**` glob pattern to wally.toml include for nested file support
