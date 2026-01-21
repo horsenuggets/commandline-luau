@@ -54,17 +54,38 @@ return function()
             expect(cmd.Name).to.equal("testcommand")
         end)
 
-        it("should throw error for non-alphanumeric lowercase name", function()
-            expect(function()
-                Command.new({ Name = "test-command" })
-            end).to.throw()
+        it("should allow kebab-case names with single hyphens", function()
+            local cmd = Command.new({ Name = "test-command" })
+            expect(cmd.Name).to.equal("test-command")
 
+            local cmd2 = Command.new({ Name = "my-long-command-name" })
+            expect(cmd2.Name).to.equal("my-long-command-name")
+        end)
+
+        it("should throw error for invalid names", function()
+            -- Underscores not allowed
             expect(function()
                 Command.new({ Name = "test_command" })
             end).to.throw()
 
+            -- Spaces not allowed
             expect(function()
                 Command.new({ Name = "test command" })
+            end).to.throw()
+
+            -- Leading hyphen not allowed
+            expect(function()
+                Command.new({ Name = "-test" })
+            end).to.throw()
+
+            -- Trailing hyphen not allowed
+            expect(function()
+                Command.new({ Name = "test-" })
+            end).to.throw()
+
+            -- Double hyphens not allowed
+            expect(function()
+                Command.new({ Name = "test--command" })
             end).to.throw()
         end)
 
