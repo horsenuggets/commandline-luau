@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.0.11
+- Fixed subcommand help displaying incomplete command path instead of full path
+
 ## 0.0.10
 - Show full command path in help display instead of capitalizing only the subcommand name
 - Update lune to 0.10.4-horse.9.0
