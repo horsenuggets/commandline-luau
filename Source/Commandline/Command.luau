@@ -27,6 +27,7 @@ export type Command = {
 
     -- Private properties
     _args: { Arg.Arg },
+    _commandPath: string,
     _flags: { Flag.Flag },
     _helpMessage: string,
     _impl: ((args: { [string]: any }, flags: { [string]: { Value: any? } }) -> any)?,
@@ -88,6 +89,7 @@ function Command.new(commandlineOptions: CommandlineOptions): Command
     self.Description = commandlineOptions.Description or "No description."
     self.Version = commandlineOptions.Version
     self._args = commandlineOptions.Args or {}
+    self._commandPath = self.Name
     self._flags = commandlineOptions.Flags or {}
     self._subcommands = commandlineOptions.Subcommands or {}
     self._impl = commandlineOptions.Impl
@@ -147,11 +149,12 @@ function Command.new(commandlineOptions: CommandlineOptions): Command
         end
     end
 
-    -- Validate uniqueness of subcommand names
+    -- Validate uniqueness of subcommand names and set command paths
     local subcommandNames = {}
     for _, subcommand in self._subcommands do
         assert(not subcommandNames[subcommand.Name], `Duplicate subcommand name "{subcommand.Name}".`)
         subcommandNames[subcommand.Name] = true
+        subcommand._commandPath = `{self.Name} {subcommand.Name}`
     end
 
     -- If Subcommands are present, we canot have Args, user-defined Flags, or Impl
@@ -186,7 +189,7 @@ end
 
 function Command._makeHelpMessage(self: Command): string
     -- Build the usage line with Flags and Args
-    local usageParts = { Chalk.blueBright(self.Name) }
+    local usageParts = { Chalk.blueBright(self._commandPath) }
 
     -- If subcommands are present, show <subcommand> instead of Args
     if #self._subcommands > 0 then
@@ -211,7 +214,7 @@ function Command._makeHelpMessage(self: Command): string
 
     local messageParts = {
         ``,
-        `{Chalk.bold(StringUtils.capitalizeFirstLetter(self.Name))}{if self.Version
+        `{Chalk.bold(self._commandPath)}{if self.Version
             then ` {Chalk.gray(`[{Chalk.greenBright(self.Version)}]`)}`
             else ``}`,
         `{Chalk.italic(Chalk.gray(`{self.Description}`))}`,
