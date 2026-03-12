@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.8
+
+- Sync project config with luau-package-template
+- Add claude-md submodule and switch submodule URLs to SSH
+- Add dev.project.json and VS Code workspace file
+- Update Testable dev-dependency to 0.1.0
+
 ## 0.0.7
 
 - Fix chalk-luau dependency version to 0.0.1
