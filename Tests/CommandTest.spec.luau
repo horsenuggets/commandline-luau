@@ -473,5 +473,50 @@ return function()
             })
             cmd:ShowHelp()
         end)
+
+        it("should show full command path for subcommands", function()
+            local sub = Command.new({
+                Name = "status",
+                Description = "Show status.",
+                Impl = function() end,
+            })
+            Command.new({
+                Name = "git",
+                Subcommands = { sub },
+            })
+            expect(sub._commandPath).to.equal("git status")
+        end)
+
+        it("should show full command path for deeply nested subcommands", function()
+            local leaf = Command.new({
+                Name = "list",
+                Description = "List items.",
+                Impl = function() end,
+            })
+            local middle = Command.new({
+                Name = "api-key",
+                Description = "Manage API keys.",
+                Subcommands = { leaf },
+            })
+            Command.new({
+                Name = "app",
+                Subcommands = { middle },
+            })
+            expect(middle._commandPath).to.equal("app api-key")
+            expect(leaf._commandPath).to.equal("app api-key list")
+        end)
+
+        it("should include command path in help message", function()
+            local sub = Command.new({
+                Name = "deploy",
+                Description = "Deploy the app.",
+                Impl = function() end,
+            })
+            Command.new({
+                Name = "myapp",
+                Subcommands = { sub },
+            })
+            expect(string.find(sub._helpMessage, "myapp deploy", 1, true)).to.be.ok()
+        end)
     end)
 end
