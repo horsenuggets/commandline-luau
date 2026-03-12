@@ -5,10 +5,6 @@
         "Source": {
             "$className": "Folder",
             "$path": "Source"
-        },
-        "Packages": {
-            "$className": "Folder",
-            "$path": "Packages"
         }
     }
 }

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.9
+- Removed Packages entry from default.project.json to fix sourcemap generation in consuming projects
+- Updated chalk-luau dependency to 0.0.3
+
 ## 0.0.8
 - Sync project config with luau-package-template
 - Add claude-md submodule and switch submodule URLs to SSH
