@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.10
+- Show full command path in help display instead of capitalizing only the subcommand name
+- Update lune to 0.10.4-horse.9.0
+
 ## 0.0.9
 - Removed Packages entry from default.project.json to fix sourcemap generation in consuming projects
 - Updated chalk-luau dependency to 0.0.3
