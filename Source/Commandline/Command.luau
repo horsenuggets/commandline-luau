@@ -154,7 +154,7 @@ function Command.new(commandlineOptions: CommandlineOptions): Command
     for _, subcommand in self._subcommands do
         assert(not subcommandNames[subcommand.Name], `Duplicate subcommand name "{subcommand.Name}".`)
         subcommandNames[subcommand.Name] = true
-        subcommand._commandPath = `{self.Name} {subcommand.Name}`
+        subcommand:_setCommandPath(`{self._commandPath} {subcommand.Name}`)
     end
 
     -- If Subcommands are present, we canot have Args, user-defined Flags, or Impl
@@ -262,6 +262,14 @@ function Command._makeHelpMessage(self: Command): string
 
     self._helpMessage = table.concat(messageParts, "\n")
     return self._helpMessage
+end
+
+function Command._setCommandPath(self: Command, path: string)
+    self._commandPath = path
+    for _, subcommand in self._subcommands do
+        subcommand:_setCommandPath(`{path} {subcommand.Name}`)
+    end
+    self:_makeHelpMessage()
 end
 
 function Command.ShowHelp(self: Command)
