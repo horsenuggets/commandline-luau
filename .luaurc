@@ -1,14 +1,24 @@
 {
     "aliases": {
-        "lune": "~/.lune/.typedefs/0.10.4+horse.0.2/",
+        "commandline": "./Source/Commandline/",
+        "devpackages": "./DevPackages/",
+        "lune": "~/.lune/.typedefs/0.10.4-horse.6.0/",
         "packages": "./Packages/",
-        "devpackages": "./DevPackages/"
+        "tests": "./Tests/"
     },
     "globals": [
+        "afterAll",
         "afterEach",
+        "beforeAll",
         "beforeEach",
         "describe",
+        "elapsedTime",
         "expect",
-        "it"
+        "fail",
+        "fdescribe",
+        "fit",
+        "it",
+        "xdescribe",
+        "xit"
     ]
 }

@@ -1,6 +1,8 @@
+.claude
 .DS_Store
 .env
 .local
+.mcp.json
 .vscode
 *.bak
 *.gen.*
@@ -9,8 +11,9 @@
 *.rbxlx
 *.rbxm
 *.rbxmx
+aftman.toml
 Build
-Packages
 DevPackages
+Packages
 sourcemap.json
 Tools
