@@ -116,6 +116,31 @@ function Command.new(commandlineOptions: CommandlineOptions): Command
         )
     end
 
+    -- Auto-include version Flag when Version is set
+    if self.Version then
+        local hasVersionFlag = false
+        local hasVShorthand = false
+        for _, flag in self._flags do
+            if flag.Name == "version" then
+                hasVersionFlag = true
+                break
+            end
+            if flag.Shorthand == "v" then
+                hasVShorthand = true
+            end
+        end
+        if not hasVersionFlag then
+            table.insert(
+                self._flags,
+                Flag.new({
+                    Name = "version",
+                    Description = "Show version.",
+                    Shorthand = if hasVShorthand then nil else "v",
+                })
+            )
+        end
+    end
+
     -- Validate all elements are correct types
     for _, subcommand in self._subcommands do
         assert(getmetatable(subcommand) == Command, "All Subcommands must be instances of Command.")
@@ -160,8 +185,14 @@ function Command.new(commandlineOptions: CommandlineOptions): Command
     -- If Subcommands are present, we canot have Args, user-defined Flags, or Impl
     if #self._subcommands > 0 then
         assert(#self._args == 0, "Cannot have Args when Subcommands are present.")
-        -- Only the auto-generated help Flag is allowed
-        assert(#self._flags == 1 and self._flags[1].Name == "help", "Cannot have Flags when Subcommands are present.")
+        -- Only the auto-generated help and version Flags are allowed
+        local autoFlagCount = 0
+        for _, flag in self._flags do
+            if flag.Name == "help" or flag.Name == "version" then
+                autoFlagCount += 1
+            end
+        end
+        assert(#self._flags == autoFlagCount, "Cannot have Flags when Subcommands are present.")
         assert(self._impl == nil, "Cannot have Impl when Subcommands are present.")
     end
 
@@ -473,6 +504,12 @@ function Command.Execute(self: Command, tokens: { string }): any
     -- Check for help Flag
     if parsedFlags.help and parsedFlags.help.Value then
         self:ShowHelp()
+        return
+    end
+
+    -- Check for version Flag
+    if parsedFlags.version and parsedFlags.version.Value then
+        print(self.Version)
         return
     end
 
