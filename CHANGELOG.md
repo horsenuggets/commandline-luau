@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.0.12
+- Added auto-included --version (-v) flag when Version is set on a Command
+
 ## 0.0.11
 - Fixed subcommand help displaying incomplete command path instead of full path
 
