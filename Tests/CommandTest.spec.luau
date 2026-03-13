@@ -47,6 +47,65 @@ return function()
             expect(#cmd._flags).to.equal(1)
         end)
 
+        it("should automatically add version Flag when Version is set", function()
+            local cmd = Command.new({
+                Name = "test",
+                Version = "1.0.0",
+            })
+            local hasVersion = false
+            for _, flag in cmd._flags do
+                if flag.Name == "version" then
+                    hasVersion = true
+                    expect(flag.Shorthand).to.equal("v")
+                end
+            end
+            expect(hasVersion).to.equal(true)
+        end)
+
+        it("should not add version Flag when Version is not set", function()
+            local cmd = Command.new({
+                Name = "test",
+            })
+            for _, flag in cmd._flags do
+                expect(flag.Name).never.to.equal("version")
+            end
+        end)
+
+        it("should not duplicate version Flag if already provided", function()
+            local cmd = Command.new({
+                Name = "test",
+                Version = "1.0.0",
+                Flags = {
+                    Flag.new({
+                        Name = "version",
+                        Description = "Custom version",
+                    }),
+                },
+            })
+            local versionCount = 0
+            for _, flag in cmd._flags do
+                if flag.Name == "version" then
+                    versionCount += 1
+                end
+            end
+            expect(versionCount).to.equal(1)
+        end)
+
+        it("should omit version shorthand when -v is already taken", function()
+            local cmd = Command.new({
+                Name = "test",
+                Version = "1.0.0",
+                Flags = {
+                    Flag.new({ Name = "verbose", Shorthand = "v" }),
+                },
+            })
+            for _, flag in cmd._flags do
+                if flag.Name == "version" then
+                    expect(flag.Shorthand).to.equal(nil)
+                end
+            end
+        end)
+
         it("should convert command name to lowercase", function()
             local cmd = Command.new({
                 Name = "TestCommand",
@@ -454,6 +513,32 @@ return function()
             })
             cmd:Execute({ "add", "test.txt" })
             expect(receivedArgs.file).to.equal("test.txt")
+        end)
+
+        it("should print version when --version flag is used", function()
+            local executed = false
+            local cmd = Command.new({
+                Name = "test",
+                Version = "1.2.3",
+                Impl = function()
+                    executed = true
+                end,
+            })
+            cmd:Execute({ "--version" })
+            expect(executed).to.equal(false)
+        end)
+
+        it("should print version when -v shorthand is used", function()
+            local executed = false
+            local cmd = Command.new({
+                Name = "test",
+                Version = "1.2.3",
+                Impl = function()
+                    executed = true
+                end,
+            })
+            cmd:Execute({ "-v" })
+            expect(executed).to.equal(false)
         end)
 
         it("should throw error for invalid tokens", function()
