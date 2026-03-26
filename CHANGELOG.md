@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.13
+- Sort flags and subcommands alphabetically in help output
+- Add shell completion generation for bash, zsh, and fish
+- Add missing CI checks to match branch protection rules
+- Add file headers to test files
+- Fix .luaurc Lune typedef version
+
 ## 0.0.12
 - Added auto-included --version (-v) flag when Version is set on a Command
 
