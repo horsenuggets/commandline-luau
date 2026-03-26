@@ -1,3 +1,11 @@
+--[[
+
+FlagTest
+
+Tests for the Flag class, covering creation, type validation, and default value handling.
+
+--]]
+
 local Flag = require("../Source/Commandline/Flag")
 
 return function()

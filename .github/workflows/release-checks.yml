@@ -137,3 +137,33 @@ jobs:
           fi
 
           echo "PR title matches VERSION file."
+
+  json-format:
+    name: Check JSON format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup Rokit
+        uses: CompeyDev/setup-rokit@v0.1.2
+
+      - name: Install prettier
+        run: npm install -g prettier
+
+      - name: Check JSON format
+        run: lune run ./Submodules/luau-cicd/Scripts/CheckJsonFormat.luau
+
+  wally-auth:
+    name: Verify Wally auth
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify WALLY_AUTH is set
+        run: |
+          if [ -z "${{ secrets.WALLY_AUTH }}" ]; then
+            echo "::error::WALLY_AUTH secret is not configured"
+            exit 1
+          fi
+          echo "Wally auth token is configured."

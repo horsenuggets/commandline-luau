@@ -1,3 +1,12 @@
+--[[
+
+TypeUtilsTest
+
+Tests for TypeUtils helper functions including type
+validation, default values, and casting.
+
+--]]
+
 local TypeUtils = require("../Source/Commandline/Helpers/TypeUtils")
 
 return function()
