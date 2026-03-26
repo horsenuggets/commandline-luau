@@ -2,7 +2,8 @@
 
 CommandTest
 
-Tests for the Command class, covering creation, execution, subcommands, and help generation.
+Tests for the Command class covering creation, execution,
+subcommands, and help generation.
 
 --]]
 

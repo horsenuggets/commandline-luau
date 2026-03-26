@@ -2,7 +2,8 @@
 
 StringUtilsTest
 
-Tests for StringUtils helper functions including capitalization, validation, and tokenization.
+Tests for StringUtils helper functions including
+capitalization, validation, and tokenization.
 
 --]]
 

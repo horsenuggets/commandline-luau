@@ -2,7 +2,8 @@
 
 TypeUtilsTest
 
-Tests for TypeUtils helper functions including type validation, default values, and casting.
+Tests for TypeUtils helper functions including type
+validation, default values, and casting.
 
 --]]
 
