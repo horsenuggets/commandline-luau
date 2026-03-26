@@ -1,3 +1,11 @@
+--[[
+
+CommandlineTest
+
+Tests for the Commandline module, covering exports, command registration, and execution.
+
+--]]
+
 local Commandline = require("../Source/Commandline")
 
 return function()

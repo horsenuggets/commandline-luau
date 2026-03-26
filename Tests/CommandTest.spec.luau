@@ -1,3 +1,12 @@
+--[[
+
+CommandTest
+
+Tests for the Command class covering creation, execution,
+subcommands, and help generation.
+
+--]]
+
 local Arg = require("../Source/Commandline/Arg")
 local Command = require("../Source/Commandline/Command")
 local Flag = require("../Source/Commandline/Flag")

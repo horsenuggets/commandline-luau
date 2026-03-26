@@ -1,3 +1,11 @@
+--[[
+
+ArgTest
+
+Tests for the Arg class, covering creation, type validation, and default value handling.
+
+--]]
+
 local Arg = require("../Source/Commandline/Arg")
 
 return function()
