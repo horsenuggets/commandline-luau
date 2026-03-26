@@ -1,6 +1,6 @@
 --[[
 
-CompletionsTest.spec
+CompletionsTest
 
 Tests for shell completion script generation. Verifies that bash, zsh, and fish
 completion scripts are generated correctly from command definitions.

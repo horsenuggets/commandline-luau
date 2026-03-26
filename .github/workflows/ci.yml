@@ -171,6 +171,9 @@ jobs:
       - name: Setup Rokit
         uses: CompeyDev/setup-rokit@v0.1.2
 
+      - name: Install prettier
+        run: npm install -g prettier
+
       - name: Check JSON format
         run: lune run ./Submodules/luau-cicd/Scripts/CheckJsonFormat.luau
 

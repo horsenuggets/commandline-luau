@@ -1,3 +1,11 @@
+--[[
+
+StringUtilsTest
+
+Tests for StringUtils helper functions including capitalization, validation, and tokenization.
+
+--]]
+
 local StringUtils = require("../Source/Commandline/Helpers/StringUtils")
 
 return function()
