@@ -258,7 +258,20 @@ function Command._makeHelpMessage(self: Command): string
     if #self._flags > 0 then
         table.insert(messageParts, ``)
         table.insert(messageParts, `{Chalk.gray(`[{Chalk.yellow(`Flags`)}]`)}`)
-        for _, flag in self._flags do
+
+        -- Sort flags alphabetically, keeping help and version last
+        local AUTO_FLAGS = { help = true, version = true }
+        local sortedFlags = table.clone(self._flags)
+        table.sort(sortedFlags, function(a, b)
+            local aIsAuto = AUTO_FLAGS[a.Name] or false
+            local bIsAuto = AUTO_FLAGS[b.Name] or false
+            if aIsAuto ~= bIsAuto then
+                return not aIsAuto
+            end
+            return a.Name < b.Name
+        end)
+
+        for _, flag in sortedFlags do
             local flagParts = {}
 
             -- Add shorthand if available
@@ -282,7 +295,11 @@ function Command._makeHelpMessage(self: Command): string
     if #self._subcommands > 0 then
         table.insert(messageParts, ``)
         table.insert(messageParts, `{Chalk.gray(`[{Chalk.yellow(`Subcommands`)}]`)}`)
-        for _, subcommand in self._subcommands do
+        local sortedSubcommands = table.clone(self._subcommands)
+        table.sort(sortedSubcommands, function(a, b)
+            return a.Name < b.Name
+        end)
+        for _, subcommand in sortedSubcommands do
             local subcommandLine =
                 `{Chalk.gray(`> `)}{Chalk.blueBright(subcommand.Name)} {Chalk.gray("--")} {Chalk.italic(
                     Chalk.gray(subcommand.Description)
