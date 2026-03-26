@@ -10,6 +10,7 @@ interfaces.
 
 local Arg = require("@self/Arg")
 local Command = require("@self/Command")
+local Completions = require("@self/Completions")
 local Flag = require("@self/Flag")
 local StringUtils = require("@self/Helpers/StringUtils")
 local t = require("@packages/t")
@@ -18,6 +19,7 @@ local Commandline = {
     -- Public static properties
     Arg = Arg,
     Command = Command,
+    Completions = Completions,
     Flag = Flag,
 
     -- Private static properties
