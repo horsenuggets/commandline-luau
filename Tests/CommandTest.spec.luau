@@ -1,6 +1,6 @@
 --[[
 
-CommandTest
+CommandTest.spec
 
 Tests for the Command class covering creation, execution,
 subcommands, and help generation.

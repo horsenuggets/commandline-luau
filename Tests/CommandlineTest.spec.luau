@@ -1,6 +1,6 @@
 --[[
 
-CommandlineTest
+CommandlineTest.spec
 
 Tests for the Commandline module, covering exports, command registration, and execution.
 

@@ -20,6 +20,7 @@ local TESTS = {
     { Name = "CompletionsTest", Func = require("../Tests/CompletionsTest.spec") },
     { Name = "FlagTest", Func = require("../Tests/FlagTest.spec") },
     { Name = "StringUtilsTest", Func = require("../Tests/StringUtilsTest.spec") },
+    { Name = "ToolkitTest", Func = require("../Tests/ToolkitTest.spec") },
     { Name = "TypeUtilsTest", Func = require("../Tests/TypeUtilsTest.spec") },
 }
 

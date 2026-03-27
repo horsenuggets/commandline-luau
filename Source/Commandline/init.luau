@@ -13,6 +13,7 @@ local Command = require("@self/Command")
 local Completions = require("@self/Completions")
 local Flag = require("@self/Flag")
 local StringUtils = require("@self/Helpers/StringUtils")
+local Toolkit = require("@self/Toolkit")
 local t = require("@packages/t")
 
 local Commandline = {
@@ -21,6 +22,7 @@ local Commandline = {
     Command = Command,
     Completions = Completions,
     Flag = Flag,
+    Toolkit = Toolkit,
 
     -- Private static properties
     _commands = {} :: { [string]: Command.Command },
