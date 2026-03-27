@@ -1,6 +1,6 @@
 --[[
 
-StringUtilsTest
+StringUtilsTest.spec
 
 Tests for StringUtils helper functions including
 capitalization, validation, and tokenization.

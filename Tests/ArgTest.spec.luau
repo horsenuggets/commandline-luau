@@ -1,6 +1,6 @@
 --[[
 
-ArgTest
+ArgTest.spec
 
 Tests for the Arg class, covering creation, type validation, and default value handling.
 
