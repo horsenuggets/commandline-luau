@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.14
+- Add Toolkit.build() for compiling Lune entry points into standalone executables
+- Add Toolkit.generateVersion() for creating version modules from VERSION files
+- Add Toolkit.completionsCommand() for shell completion subcommands
+- Add cross-platform require patching for Windows executable compatibility
+- Fix test file headers to include .spec sub-extension
+
 ## 0.0.13
 - Sort flags and subcommands alphabetically in help output
 - Add shell completion generation for bash, zsh, and fish
