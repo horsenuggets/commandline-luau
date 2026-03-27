@@ -1,6 +1,6 @@
 --[[
 
-FlagTest
+FlagTest.spec
 
 Tests for the Flag class, covering creation, type validation, and default value handling.
 
