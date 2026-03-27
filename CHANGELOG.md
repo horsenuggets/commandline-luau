@@ -8,18 +8,18 @@
 - Fix .luaurc Lune typedef version
 
 ## 0.0.12
-- Added auto-included --version (-v) flag when Version is set on a Command
+- Add auto-included --version (-v) flag when Version is set on a Command
 
 ## 0.0.11
-- Fixed subcommand help displaying incomplete command path instead of full path
+- Fix subcommand help displaying incomplete command path instead of full path
 
 ## 0.0.10
 - Show full command path in help display instead of capitalizing only the subcommand name
 - Update lune to 0.10.4-horse.9.0
 
 ## 0.0.9
-- Removed Packages entry from default.project.json to fix sourcemap generation in consuming projects
-- Updated chalk-luau dependency to 0.0.3
+- Remove Packages entry from default.project.json to fix sourcemap generation in consuming projects
+- Update chalk-luau dependency to 0.0.3
 
 ## 0.0.8
 - Sync project config with luau-package-template
