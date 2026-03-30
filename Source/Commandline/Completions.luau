@@ -421,18 +421,120 @@ function Completions.fish(command: Command): string
     return table.concat(lines, "\n")
 end
 
+-- PowerShell completion generator
+
+local function escapePowerShellString(str: string): string
+    return (string.gsub(str, "'", "''"))
+end
+
+function Completions.powershell(command: Command): string
+    assert(t.table(command))
+
+    local name = command.Name
+    local lines = {}
+
+    table.insert(lines, "# Completions for " .. name)
+    table.insert(lines, "Register-ArgumentCompleter -CommandName " .. name .. " -ScriptBlock {")
+    table.insert(lines, "    param($wordToComplete, $commandAst, $cursorPosition)")
+    table.insert(lines, "")
+    table.insert(lines, "    $tokens = $commandAst.ToString().Split(' ', [StringSplitOptions]::RemoveEmptyEntries)")
+    table.insert(
+        lines,
+        "    $subcommand = if ($tokens.Count -gt 1 -and $tokens[1] -notlike '-*') { $tokens[1] } else { $null }"
+    )
+    table.insert(lines, "")
+
+    -- Subcommand completions
+    if #command._subcommands > 0 then
+        table.insert(lines, "    if (-not $subcommand) {")
+
+        for _, sub in command._subcommands do
+            local desc = escapePowerShellString(sub.Description)
+            table.insert(
+                lines,
+                "        [System.Management.Automation.CompletionResult]::new('"
+                    .. sub.Name
+                    .. "', '"
+                    .. sub.Name
+                    .. "', 'ParameterValue', '"
+                    .. desc
+                    .. "')"
+            )
+        end
+
+        -- Root flags
+        for _, flag in command._flags do
+            local desc = escapePowerShellString(flag.Description)
+            table.insert(
+                lines,
+                "        [System.Management.Automation.CompletionResult]::new('--"
+                    .. flag.Name
+                    .. "', '--"
+                    .. flag.Name
+                    .. "', 'ParameterName', '"
+                    .. desc
+                    .. "')"
+            )
+        end
+
+        table.insert(lines, "        return")
+        table.insert(lines, "    }")
+        table.insert(lines, "")
+
+        -- Per-subcommand flag completions
+        table.insert(lines, "    switch ($subcommand) {")
+        for _, sub in command._subcommands do
+            table.insert(lines, "        '" .. sub.Name .. "' {")
+            for _, flag in sub._flags do
+                local desc = escapePowerShellString(flag.Description)
+                table.insert(
+                    lines,
+                    "            [System.Management.Automation.CompletionResult]::new('--"
+                        .. flag.Name
+                        .. "', '--"
+                        .. flag.Name
+                        .. "', 'ParameterName', '"
+                        .. desc
+                        .. "')"
+                )
+                if flag.Shorthand then
+                    table.insert(
+                        lines,
+                        "            [System.Management.Automation.CompletionResult]::new('-"
+                            .. flag.Shorthand
+                            .. "', '-"
+                            .. flag.Shorthand
+                            .. "', 'ParameterName', '"
+                            .. desc
+                            .. "')"
+                    )
+                end
+            end
+            table.insert(lines, "        }")
+        end
+        table.insert(lines, "    }")
+    end
+
+    table.insert(lines, "}")
+    table.insert(lines, "")
+
+    return table.concat(lines, "\n")
+end
+
 function Completions.generate(command: Command, shell: string): string
     assert(t.table(command))
     assert(t.string(shell))
 
     if shell == "bash" then
         return Completions.bash(command)
-    elseif shell == "zsh" then
-        return Completions.zsh(command)
     elseif shell == "fish" then
         return Completions.fish(command)
+    elseif shell == "powershell" or shell == "pwsh" then
+        return Completions.powershell(command)
+    elseif shell == "zsh" then
+        return Completions.zsh(command)
     else
-        error('Unsupported shell "' .. shell .. '". Supported shells are bash, zsh, and fish.')
+        error('Unsupported shell "' .. shell .. '". Supported shells are bash, fish, powershell, and zsh.')
     end
 end
 
