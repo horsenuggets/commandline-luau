@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.16
+- Add file headers to auto-generated version modules
+- Bump lune to 0.10.4-horse.14.1
+
 ## 0.0.15
 - Add PowerShell completion generator with context-aware subcommand and flag filtering
 - Add Toolkit.installCompletions() support for PowerShell profile integration
