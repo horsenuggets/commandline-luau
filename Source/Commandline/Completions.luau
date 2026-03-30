@@ -432,6 +432,8 @@ function Completions.powershell(command: Command): string
 
     local name = command.Name
     local lines = {}
+    local filter = [[| Where-Object { $_.CompletionText -like "$wordToComplete*" }]]
+    local cr = "[System.Management.Automation.CompletionResult]"
 
     table.insert(lines, "# Completions for " .. name)
     table.insert(lines, "Register-ArgumentCompleter -CommandName " .. name .. " -ScriptBlock {")
@@ -444,17 +446,27 @@ function Completions.powershell(command: Command): string
         lines,
         "    $sub = if ($tokens.Count -gt 1 -and " .. "$tokens[1] -notlike '-*') { $tokens[1] } else { $null }"
     )
-    table.insert(lines, "")
 
     if #command._subcommands > 0 then
-        -- Root level: show subcommands or root flags depending on context
-        table.insert(lines, "    if (-not $sub) {")
+        -- Build subcommand list for validation
+        local subNames = {}
+        for _, sub in command._subcommands do
+            table.insert(subNames, "'" .. sub.Name .. "'")
+        end
+        table.insert(lines, "    $subcommands = @(" .. table.concat(subNames, ", ") .. ")")
+        table.insert(lines, "    $isValidSub = $sub -and ($subcommands -contains $sub)")
+        table.insert(lines, "")
+
+        -- Root level: show subcommands or root flags
+        table.insert(lines, "    if (-not $isValidSub) {")
         table.insert(lines, "        if ($wordToComplete -like '-*') {")
+        table.insert(lines, "            @(")
         for _, flag in command._flags do
             local desc = escapePowerShellString(flag.Description)
             table.insert(
                 lines,
-                "            [System.Management.Automation.CompletionResult]"
+                "                "
+                    .. cr
                     .. "::new('--"
                     .. flag.Name
                     .. "', '--"
@@ -464,12 +476,15 @@ function Completions.powershell(command: Command): string
                     .. "')"
             )
         end
+        table.insert(lines, "            ) " .. filter)
         table.insert(lines, "        } else {")
+        table.insert(lines, "            @(")
         for _, sub in command._subcommands do
             local desc = escapePowerShellString(sub.Description)
             table.insert(
                 lines,
-                "            [System.Management.Automation.CompletionResult]"
+                "                "
+                    .. cr
                     .. "::new('"
                     .. sub.Name
                     .. "', '"
@@ -479,19 +494,21 @@ function Completions.powershell(command: Command): string
                     .. "')"
             )
         end
+        table.insert(lines, "            ) " .. filter)
         table.insert(lines, "        }")
-        table.insert(lines, "    }")
-        table.insert(lines, "")
 
-        -- Per-subcommand flags
-        table.insert(lines, "    switch ($sub) {")
+        -- Subcommand flags
+        table.insert(lines, "    } elseif ($wordToComplete -ne $sub) {")
+        table.insert(lines, "        switch ($sub) {")
         for _, sub in command._subcommands do
-            table.insert(lines, "        '" .. sub.Name .. "' {")
+            table.insert(lines, "            '" .. sub.Name .. "' {")
+            table.insert(lines, "                @(")
             for _, flag in sub._flags do
                 local desc = escapePowerShellString(flag.Description)
                 table.insert(
                     lines,
-                    "            [System.Management.Automation.CompletionResult]"
+                    "                    "
+                        .. cr
                         .. "::new('--"
                         .. flag.Name
                         .. "', '--"
@@ -501,15 +518,19 @@ function Completions.powershell(command: Command): string
                         .. "')"
                 )
             end
-            table.insert(lines, "        }")
+            table.insert(lines, "                ) " .. filter)
+            table.insert(lines, "            }")
         end
+        table.insert(lines, "        }")
         table.insert(lines, "    }")
     else
+        table.insert(lines, "    @(")
         for _, flag in command._flags do
             local desc = escapePowerShellString(flag.Description)
             table.insert(
                 lines,
-                "    [System.Management.Automation.CompletionResult]"
+                "        "
+                    .. cr
                     .. "::new('--"
                     .. flag.Name
                     .. "', '--"
@@ -519,6 +540,7 @@ function Completions.powershell(command: Command): string
                     .. "')"
             )
         end
+        table.insert(lines, "    ) " .. filter)
     end
 
     table.insert(lines, "}")
