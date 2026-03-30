@@ -59,7 +59,9 @@ return function()
                 OutputPath = tempDir .. "/__VERSION__.luau",
             })
             expect(fs.isFile(tempDir .. "/__VERSION__.luau")).to.equal(true)
-            expect(readFile(tempDir, "__VERSION__.luau")).to.equal('return "1.2.3"\n')
+            expect(readFile(tempDir, "__VERSION__.luau")).to.equal(
+                '--[[\n\n__VERSION__\n\nAuto-generated version module.\n\n--]]\n\nreturn "1.2.3"\n'
+            )
             cleanup(tempDir)
         end)
 
@@ -70,7 +72,9 @@ return function()
                 VersionFile = tempDir .. "/VERSION",
                 OutputPath = tempDir .. "/__VERSION__.luau",
             })
-            expect(readFile(tempDir, "__VERSION__.luau")).to.equal('return "0.5.10"\n')
+            expect(readFile(tempDir, "__VERSION__.luau")).to.equal(
+                '--[[\n\n__VERSION__\n\nAuto-generated version module.\n\n--]]\n\nreturn "0.5.10"\n'
+            )
             cleanup(tempDir)
         end)
 
@@ -81,7 +85,9 @@ return function()
                 VersionFile = tempDir .. "/VERSION",
                 OutputPath = tempDir .. "/__VERSION__.luau",
             })
-            expect(readFile(tempDir, "__VERSION__.luau")).to.equal('return "2.0.0"\n')
+            expect(readFile(tempDir, "__VERSION__.luau")).to.equal(
+                '--[[\n\n__VERSION__\n\nAuto-generated version module.\n\n--]]\n\nreturn "2.0.0"\n'
+            )
             cleanup(tempDir)
         end)
 
@@ -92,7 +98,9 @@ return function()
                 VersionFile = tempDir .. "/VERSION",
                 OutputPath = tempDir .. "/__VERSION__.luau",
             })
-            expect(readFile(tempDir, "__VERSION__.luau")).to.equal('return "0.10.4-horse.10.0"\n')
+            expect(readFile(tempDir, "__VERSION__.luau")).to.equal(
+                '--[[\n\n__VERSION__\n\nAuto-generated version module.\n\n--]]\n\nreturn "0.10.4-horse.10.0"\n'
+            )
             cleanup(tempDir)
         end)
 
@@ -118,7 +126,9 @@ return function()
                 VersionFile = tempDir .. "/VERSION",
                 OutputPath = tempDir .. "/out.luau",
             })
-            expect(readFile(tempDir, "out.luau")).to.equal('return "3.0.0"\n')
+            expect(readFile(tempDir, "out.luau")).to.equal(
+                '--[[\n\n__VERSION__\n\nAuto-generated version module.\n\n--]]\n\nreturn "3.0.0"\n'
+            )
             cleanup(tempDir)
         end)
     end)
