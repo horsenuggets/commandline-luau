@@ -200,7 +200,9 @@ function Toolkit.generateVersion(options: {
     end
 
     local version = string.gsub(fs.readFile(versionFile), "%s+", "")
-    local versionModule = 'return "' .. version .. '"\n'
+    local versionModule = '--[[\n\n__VERSION__\n\nAuto-generated version module.\n\n--]]\n\nreturn "'
+        .. version
+        .. '"\n'
 
     -- Create parent directories if needed
     local parentDir = string.match(options.OutputPath, "(.+)/[^/]+$")
