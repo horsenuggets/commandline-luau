@@ -2,8 +2,9 @@
 
 CompletionsTest.spec
 
-Tests for shell completion script generation. Verifies that bash, zsh, and fish
-completion scripts are generated correctly from command definitions.
+Tests for shell completion script generation. Verifies that bash, zsh, fish,
+and PowerShell completion scripts are generated correctly from command
+definitions.
 
 --]]
 
@@ -73,15 +74,17 @@ return function()
         it("should throw for unsupported shell", function()
             local cmd = makeSimpleCommand()
             expect(function()
-                Completions.generate(cmd, "powershell")
+                Completions.generate(cmd, "nushell")
             end).to.throw()
         end)
 
-        it("should accept bash, zsh, and fish", function()
+        it("should accept all supported shells", function()
             local cmd = makeSimpleCommand()
             expect(Completions.generate(cmd, "bash")).to.be.ok()
-            expect(Completions.generate(cmd, "zsh")).to.be.ok()
             expect(Completions.generate(cmd, "fish")).to.be.ok()
+            expect(Completions.generate(cmd, "powershell")).to.be.ok()
+            expect(Completions.generate(cmd, "pwsh")).to.be.ok()
+            expect(Completions.generate(cmd, "zsh")).to.be.ok()
         end)
     end)
 
@@ -145,10 +148,10 @@ return function()
             expect(string.find(output, "init:Initialize a new project")).to.be.ok()
         end)
 
-        it("should use _describe for subcommand completion", function()
+        it("should use compadd for subcommand completion", function()
             local cmd = makeCommandWithSubcommands()
             local output = Completions.zsh(cmd)
-            expect(string.find(output, "_describe 'command' commands")).to.be.ok()
+            expect(string.find(output, "compadd %-V unsorted %-l %-d display_cmds %-a cmd_names")).to.be.ok()
         end)
 
         it("should include typed flag value placeholder", function()
@@ -211,6 +214,51 @@ return function()
             expect(string.find(output, '%-a "run"')).to.be.ok()
             expect(string.find(output, "__fish_seen_subcommand_from build")).to.be.ok()
             expect(string.find(output, "__fish_seen_subcommand_from run")).to.be.ok()
+        end)
+    end)
+
+    describe("powershell", function()
+        it("should register an argument completer", function()
+            local cmd = makeSimpleCommand()
+            local output = Completions.powershell(cmd)
+            expect(string.find(output, "Register%-ArgumentCompleter %-CommandName mytool")).to.be.ok()
+        end)
+
+        it("should include flag names", function()
+            local cmd = makeSimpleCommand()
+            local output = Completions.powershell(cmd)
+            expect(string.find(output, "%-%-verbose")).to.be.ok()
+            expect(string.find(output, "%-%-output")).to.be.ok()
+        end)
+
+        it("should include subcommand names", function()
+            local cmd = makeCommandWithSubcommands()
+            local output = Completions.powershell(cmd)
+            expect(string.find(output, "build")).to.be.ok()
+            expect(string.find(output, "run")).to.be.ok()
+            expect(string.find(output, "init")).to.be.ok()
+        end)
+
+        it("should include subcommand flags", function()
+            local cmd = makeCommandWithSubcommands()
+            local output = Completions.powershell(cmd)
+            expect(string.find(output, "%-%-release")).to.be.ok()
+            expect(string.find(output, "%-%-target")).to.be.ok()
+            expect(string.find(output, "%-%-port")).to.be.ok()
+        end)
+
+        it("should separate flags from subcommands by context", function()
+            local cmd = makeCommandWithSubcommands()
+            local output = Completions.powershell(cmd)
+            expect(string.find(output, "$wordToComplete %-like '%-%*'")).to.be.ok()
+        end)
+
+        it("should not include shorthand flags", function()
+            local cmd = makeCommandWithSubcommands()
+            local output = Completions.powershell(cmd)
+            expect(string.find(output, "'%-r'")).to.equal(nil)
+            expect(string.find(output, "'%-t'")).to.equal(nil)
+            expect(string.find(output, "'%-p'")).to.equal(nil)
         end)
     end)
 end

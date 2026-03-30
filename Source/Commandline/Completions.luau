@@ -210,7 +210,33 @@ local function generateZshSubcommands(lines: { string }, command: Command, inden
 
     table.insert(lines, indent .. "case $state in")
     table.insert(lines, indent .. "    cmd)")
-    table.insert(lines, indent .. "        _describe 'command' commands")
+    table.insert(lines, indent .. "        local -a display_cmds cmd_names")
+    local esc = "\\e"
+    local blue = esc .. "[94m"
+    local dim = esc .. "[90m"
+    local reset = esc .. "[0m"
+    for _, sub in command._subcommands do
+        local desc = escapeShellString(sub.Description)
+        table.insert(
+            lines,
+            indent
+                .. "        display_cmds+=($'"
+                .. dim
+                .. "> "
+                .. reset
+                .. blue
+                .. sub.Name
+                .. reset
+                .. " "
+                .. dim
+                .. "-- "
+                .. desc
+                .. reset
+                .. "')"
+        )
+        table.insert(lines, indent .. "        cmd_names+=('" .. sub.Name .. "')")
+    end
+    table.insert(lines, indent .. "        compadd -V unsorted -l -d display_cmds -a cmd_names")
     table.insert(lines, indent .. "        ;;")
     table.insert(lines, indent .. "    args)")
     table.insert(lines, indent .. "        case $words[1] in")
@@ -221,15 +247,33 @@ local function generateZshSubcommands(lines: { string }, command: Command, inden
         if #sub._subcommands > 0 then
             generateZshSubcommands(lines, sub, indent .. "                ")
         else
-            local subFlagSpecs = {}
+            local subIndent = indent .. "                "
+            table.insert(lines, subIndent .. "local -a flag_display flag_names")
             for _, flag in sub._flags do
-                table.insert(subFlagSpecs, zshFlagSpec(flag))
+                local desc = escapeShellString(flag.Description)
+                local nameDisplay = if flag.Shorthand
+                    then "-" .. flag.Shorthand .. ", --" .. flag.Name
+                    else "--" .. flag.Name
+                table.insert(
+                    lines,
+                    subIndent
+                        .. "flag_display+=($'"
+                        .. dim
+                        .. "> "
+                        .. reset
+                        .. blue
+                        .. nameDisplay
+                        .. reset
+                        .. " "
+                        .. dim
+                        .. "-- "
+                        .. desc
+                        .. reset
+                        .. "')"
+                )
+                table.insert(lines, subIndent .. "flag_names+=('--" .. flag.Name .. "')")
             end
-            table.insert(lines, indent .. "                _arguments \\")
-            for _, spec in subFlagSpecs do
-                table.insert(lines, indent .. "                    " .. spec .. " \\")
-            end
-            table.insert(lines, indent .. "                    '*:file:_files'")
+            table.insert(lines, subIndent .. "compadd -V unsorted -l -d flag_display -a flag_names")
         end
 
         table.insert(lines, indent .. "                ;;")
@@ -249,6 +293,12 @@ function Completions.zsh(command: Command): string
     table.insert(lines, "#compdef " .. name)
     table.insert(lines, "")
     table.insert(lines, "_" .. name .. "() {")
+    -- Style completions to match the CLI help output:
+    -- bright blue command names, dim gray separator and descriptions
+    table.insert(lines, "    zstyle ':completion:*:" .. name .. ":*' group-name ''")
+    table.insert(lines, "    zstyle ':completion:*:" .. name .. ":*:descriptions' format ''")
+    table.insert(lines, "    zstyle ':completion:*:" .. name .. ":*' list-colors '=(#b)([^ ]#)([ ]#-- *)=90=94'")
+    table.insert(lines, "")
 
     if #command._subcommands > 0 then
         generateZshSubcommands(lines, command, "    ")
@@ -371,18 +421,148 @@ function Completions.fish(command: Command): string
     return table.concat(lines, "\n")
 end
 
+-- PowerShell completion generator
+
+local function escapePowerShellString(str: string): string
+    return (string.gsub(str, "'", "''"))
+end
+
+function Completions.powershell(command: Command): string
+    assert(t.table(command))
+
+    local name = command.Name
+    local lines = {}
+    local filter = [[| Where-Object { $_.CompletionText -like "$wordToComplete*" }]]
+    local cr = "[System.Management.Automation.CompletionResult]"
+
+    table.insert(lines, "# Completions for " .. name)
+    table.insert(lines, "Register-ArgumentCompleter -CommandName " .. name .. " -ScriptBlock {")
+    table.insert(lines, "    param($wordToComplete, $commandAst, $cursorPosition)")
+    table.insert(
+        lines,
+        "    $tokens = $commandAst.ToString().Split(" .. "' ', [StringSplitOptions]::RemoveEmptyEntries)"
+    )
+    table.insert(
+        lines,
+        "    $sub = if ($tokens.Count -gt 1 -and " .. "$tokens[1] -notlike '-*') { $tokens[1] } else { $null }"
+    )
+
+    if #command._subcommands > 0 then
+        -- Build subcommand list for validation
+        local subNames = {}
+        for _, sub in command._subcommands do
+            table.insert(subNames, "'" .. sub.Name .. "'")
+        end
+        table.insert(lines, "    $subcommands = @(" .. table.concat(subNames, ", ") .. ")")
+        table.insert(lines, "    $isValidSub = $sub -and ($subcommands -contains $sub)")
+        table.insert(lines, "")
+
+        -- Root level: show subcommands or root flags
+        table.insert(lines, "    if (-not $isValidSub) {")
+        table.insert(lines, "        if ($wordToComplete -like '-*') {")
+        table.insert(lines, "            @(")
+        for _, flag in command._flags do
+            local desc = escapePowerShellString(flag.Description)
+            table.insert(
+                lines,
+                "                "
+                    .. cr
+                    .. "::new('--"
+                    .. flag.Name
+                    .. "', '--"
+                    .. flag.Name
+                    .. "', 'ParameterName', '"
+                    .. desc
+                    .. "')"
+            )
+        end
+        table.insert(lines, "            ) " .. filter)
+        table.insert(lines, "        } else {")
+        table.insert(lines, "            @(")
+        for _, sub in command._subcommands do
+            local desc = escapePowerShellString(sub.Description)
+            table.insert(
+                lines,
+                "                "
+                    .. cr
+                    .. "::new('"
+                    .. sub.Name
+                    .. "', '"
+                    .. sub.Name
+                    .. "', 'ParameterValue', '"
+                    .. desc
+                    .. "')"
+            )
+        end
+        table.insert(lines, "            ) " .. filter)
+        table.insert(lines, "        }")
+
+        -- Subcommand flags
+        table.insert(lines, "    } elseif ($wordToComplete -ne $sub) {")
+        table.insert(lines, "        switch ($sub) {")
+        for _, sub in command._subcommands do
+            table.insert(lines, "            '" .. sub.Name .. "' {")
+            table.insert(lines, "                @(")
+            for _, flag in sub._flags do
+                local desc = escapePowerShellString(flag.Description)
+                table.insert(
+                    lines,
+                    "                    "
+                        .. cr
+                        .. "::new('--"
+                        .. flag.Name
+                        .. "', '--"
+                        .. flag.Name
+                        .. "', 'ParameterName', '"
+                        .. desc
+                        .. "')"
+                )
+            end
+            table.insert(lines, "                ) " .. filter)
+            table.insert(lines, "            }")
+        end
+        table.insert(lines, "        }")
+        table.insert(lines, "    }")
+    else
+        table.insert(lines, "    @(")
+        for _, flag in command._flags do
+            local desc = escapePowerShellString(flag.Description)
+            table.insert(
+                lines,
+                "        "
+                    .. cr
+                    .. "::new('--"
+                    .. flag.Name
+                    .. "', '--"
+                    .. flag.Name
+                    .. "', 'ParameterName', '"
+                    .. desc
+                    .. "')"
+            )
+        end
+        table.insert(lines, "    ) " .. filter)
+    end
+
+    table.insert(lines, "}")
+    table.insert(lines, "")
+
+    return table.concat(lines, "\n")
+end
+
 function Completions.generate(command: Command, shell: string): string
     assert(t.table(command))
     assert(t.string(shell))
 
     if shell == "bash" then
         return Completions.bash(command)
-    elseif shell == "zsh" then
-        return Completions.zsh(command)
     elseif shell == "fish" then
         return Completions.fish(command)
+    elseif shell == "powershell" or shell == "pwsh" then
+        return Completions.powershell(command)
+    elseif shell == "zsh" then
+        return Completions.zsh(command)
     else
-        error('Unsupported shell "' .. shell .. '". Supported shells are bash, zsh, and fish.')
+        error('Unsupported shell "' .. shell .. '". Supported shells are bash, fish, powershell, and zsh.')
     end
 end
 
