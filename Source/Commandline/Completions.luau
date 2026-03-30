@@ -436,42 +436,25 @@ function Completions.powershell(command: Command): string
     table.insert(lines, "# Completions for " .. name)
     table.insert(lines, "Register-ArgumentCompleter -CommandName " .. name .. " -ScriptBlock {")
     table.insert(lines, "    param($wordToComplete, $commandAst, $cursorPosition)")
-    table.insert(lines, "")
     table.insert(
         lines,
         "    $tokens = $commandAst.ToString().Split(" .. "' ', [StringSplitOptions]::RemoveEmptyEntries)"
     )
     table.insert(
         lines,
-        "    $subcommand = if ($tokens.Count -gt 1 -and "
-            .. "$tokens[1] -notlike '-*') { $tokens[1] }"
-            .. " else { $null }"
+        "    $sub = if ($tokens.Count -gt 1 -and " .. "$tokens[1] -notlike '-*') { $tokens[1] } else { $null }"
     )
     table.insert(lines, "")
 
     if #command._subcommands > 0 then
-        table.insert(lines, "    if (-not $subcommand) {")
-
-        for _, sub in command._subcommands do
-            local desc = escapePowerShellString(sub.Description)
-            table.insert(
-                lines,
-                "        [System.Management.Automation.CompletionResult]"
-                    .. "::new('"
-                    .. sub.Name
-                    .. "', '"
-                    .. sub.Name
-                    .. "', 'ParameterValue', '"
-                    .. desc
-                    .. "')"
-            )
-        end
-
+        -- Root level: show subcommands or root flags depending on context
+        table.insert(lines, "    if (-not $sub) {")
+        table.insert(lines, "        if ($wordToComplete -like '-*') {")
         for _, flag in command._flags do
             local desc = escapePowerShellString(flag.Description)
             table.insert(
                 lines,
-                "        [System.Management.Automation.CompletionResult]"
+                "            [System.Management.Automation.CompletionResult]"
                     .. "::new('--"
                     .. flag.Name
                     .. "', '--"
@@ -481,20 +464,35 @@ function Completions.powershell(command: Command): string
                     .. "')"
             )
         end
-
-        table.insert(lines, "        return")
+        table.insert(lines, "        } else {")
+        for _, sub in command._subcommands do
+            local desc = escapePowerShellString(sub.Description)
+            table.insert(
+                lines,
+                "            [System.Management.Automation.CompletionResult]"
+                    .. "::new('"
+                    .. sub.Name
+                    .. "', '"
+                    .. sub.Name
+                    .. "', 'ParameterValue', '"
+                    .. desc
+                    .. "')"
+            )
+        end
+        table.insert(lines, "        }")
         table.insert(lines, "    }")
         table.insert(lines, "")
 
-        table.insert(lines, "    switch ($subcommand) {")
+        -- Per-subcommand flags
+        table.insert(lines, "    switch ($sub) {")
         for _, sub in command._subcommands do
             table.insert(lines, "        '" .. sub.Name .. "' {")
             for _, flag in sub._flags do
                 local desc = escapePowerShellString(flag.Description)
                 table.insert(
                     lines,
-                    "            [System.Management.Automation."
-                        .. "CompletionResult]::new('--"
+                    "            [System.Management.Automation.CompletionResult]"
+                        .. "::new('--"
                         .. flag.Name
                         .. "', '--"
                         .. flag.Name
@@ -502,23 +500,25 @@ function Completions.powershell(command: Command): string
                         .. desc
                         .. "')"
                 )
-                if flag.Shorthand then
-                    table.insert(
-                        lines,
-                        "            [System.Management.Automation."
-                            .. "CompletionResult]::new('-"
-                            .. flag.Shorthand
-                            .. "', '-"
-                            .. flag.Shorthand
-                            .. "', 'ParameterName', '"
-                            .. desc
-                            .. "')"
-                    )
-                end
             end
             table.insert(lines, "        }")
         end
         table.insert(lines, "    }")
+    else
+        for _, flag in command._flags do
+            local desc = escapePowerShellString(flag.Description)
+            table.insert(
+                lines,
+                "    [System.Management.Automation.CompletionResult]"
+                    .. "::new('--"
+                    .. flag.Name
+                    .. "', '--"
+                    .. flag.Name
+                    .. "', 'ParameterName', '"
+                    .. desc
+                    .. "')"
+            )
+        end
     end
 
     table.insert(lines, "}")
