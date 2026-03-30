@@ -363,6 +363,74 @@ function Toolkit.completionsCommand(getRootCommand: () -> any): any
     })
 end
 
+--[[
+    Installs shell completion scripts to ~/.commandline-luau/completions/
+    and configures the user's shell to load them.
+
+    Currently supports zsh. Adds fpath and compinit to ~/.zshrc if not
+    already present, with a comment block explaining the addition.
+
+    Options:
+    > Command - The root command to generate completions from
+    > Shell - Shell type (default "zsh")
+]]
+function Toolkit.installCompletions(options: {
+    Command: any,
+    Shell: string?,
+})
+    assert(t.table(options))
+    assert(t.table(options.Command))
+
+    local shell = options.Shell or "zsh"
+    local homeDir = process.env.HOME or process.env.USERPROFILE or ""
+    local completionsDir = homeDir .. "/.commandline-luau/completions"
+    local commandName = options.Command.Name
+
+    -- Generate the completion script
+    local script = Completions.generate(options.Command, shell)
+
+    -- Write the completion file
+    if not fs.isDir(completionsDir) then
+        fs.writeDir(completionsDir)
+    end
+
+    local completionFile = completionsDir .. "/_" .. commandName
+    fs.writeFile(completionFile, script)
+    print("Installed " .. shell .. " completions to " .. Chalk.dim(completionFile) .. ".")
+
+    -- Configure zsh to load completions
+    if shell == "zsh" then
+        local zshrcPath = homeDir .. "/.zshrc"
+        local marker = "# Added by commandline-luau"
+        local fPathLine = "fpath=(~/.commandline-luau/completions $fpath)"
+        local compInitLine = "autoload -Uz compinit && compinit"
+
+        local content = ""
+        if fs.isFile(zshrcPath) then
+            content = fs.readFile(zshrcPath)
+        end
+
+        if string.find(content, marker, 1, true) then
+            print(Chalk.dim("Shell config already configured."))
+            return
+        end
+
+        -- Add newline before our block if file has content
+        if content ~= "" and not string.match(content, "\n$") then
+            content = content .. "\n"
+        end
+        if content ~= "" then
+            content = content .. "\n"
+        end
+
+        content = content .. marker .. "\n" .. fPathLine .. "\n" .. compInitLine .. "\n"
+
+        fs.writeFile(zshrcPath, content)
+        print("Added completions to " .. Chalk.dim(zshrcPath) .. ".")
+        print(Chalk.yellow("Restart your terminal to enable completions."))
+    end
+end
+
 -- Exposed for testing
 Toolkit._patchRelativeRequires = patchRelativeRequires
 Toolkit._restoreFiles = restoreFiles
