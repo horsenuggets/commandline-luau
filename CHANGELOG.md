@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.15
+- Add PowerShell completion generator with context-aware subcommand and flag filtering
+- Add Toolkit.installCompletions() support for PowerShell profile integration
+- Add colored zsh completions using compadd with ANSI escape display
+- Update luau-cicd submodule with executable script bits
+- Bump lune to 0.10.4-horse.14.0
+
 ## 0.0.14
 - Add Toolkit.build() for compiling Lune entry points into standalone executables
 - Add Toolkit.generateVersion() for creating version modules from VERSION files
