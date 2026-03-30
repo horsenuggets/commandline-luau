@@ -394,20 +394,28 @@ function Toolkit.installCompletions(options: {
         fs.writeDir(completionsDir)
     end
 
-    local completionFile = completionsDir .. "/_" .. commandName
+    -- Use shell-appropriate file naming and config path
+    local completionFile
+    if shell == "powershell" or shell == "pwsh" then
+        completionFile = completionsDir .. "/" .. commandName .. ".ps1"
+    else
+        completionFile = completionsDir .. "/_" .. commandName
+    end
+
     fs.writeFile(completionFile, script)
     print("Installed " .. shell .. " completions to " .. Chalk.dim(completionFile) .. ".")
 
-    -- Configure zsh to load completions
+    -- Configure the shell to load completions
+    local marker = "# Added by commandline-luau"
+
     if shell == "zsh" then
-        local zshrcPath = homeDir .. "/.zshrc"
-        local marker = "# Added by commandline-luau"
+        local configPath = homeDir .. "/.zshrc"
         local fPathLine = "fpath=(~/.commandline-luau/completions $fpath)"
         local compInitLine = "autoload -Uz compinit && compinit"
 
         local content = ""
-        if fs.isFile(zshrcPath) then
-            content = fs.readFile(zshrcPath)
+        if fs.isFile(configPath) then
+            content = fs.readFile(configPath)
         end
 
         if string.find(content, marker, 1, true) then
@@ -415,7 +423,6 @@ function Toolkit.installCompletions(options: {
             return
         end
 
-        -- Add newline before our block if file has content
         if content ~= "" and not string.match(content, "\n$") then
             content = content .. "\n"
         end
@@ -425,9 +432,42 @@ function Toolkit.installCompletions(options: {
 
         content = content .. marker .. "\n" .. fPathLine .. "\n" .. compInitLine .. "\n"
 
-        fs.writeFile(zshrcPath, content)
-        print("Added completions to " .. Chalk.dim(zshrcPath) .. ".")
+        fs.writeFile(configPath, content)
+        print("Added completions to " .. Chalk.dim(configPath) .. ".")
         print(Chalk.yellow("Restart your terminal to enable completions."))
+    elseif shell == "powershell" or shell == "pwsh" then
+        -- Find or create the PowerShell profile
+        local profileDir = homeDir .. "/.config/powershell"
+        local profilePath = profileDir .. "/Microsoft.PowerShell_profile.ps1"
+
+        if not fs.isDir(profileDir) then
+            fs.writeDir(profileDir)
+        end
+
+        local content = ""
+        if fs.isFile(profilePath) then
+            content = fs.readFile(profilePath)
+        end
+
+        if string.find(content, marker, 1, true) then
+            print(Chalk.dim("Shell config already configured."))
+            return
+        end
+
+        if content ~= "" and not string.match(content, "\n$") then
+            content = content .. "\n"
+        end
+        if content ~= "" then
+            content = content .. "\n"
+        end
+
+        local sourceLine = ". " .. completionFile
+
+        content = content .. marker .. "\n" .. sourceLine .. "\n"
+
+        fs.writeFile(profilePath, content)
+        print("Added completions to " .. Chalk.dim(profilePath) .. ".")
+        print(Chalk.yellow("Restart PowerShell to enable completions."))
     end
 end
 
