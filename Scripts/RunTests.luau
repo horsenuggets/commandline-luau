@@ -19,7 +19,9 @@ local TESTS = {
     { Name = "CommandlineTest", Func = require("../Tests/CommandlineTest.spec") },
     { Name = "CompletionsTest", Func = require("../Tests/CompletionsTest.spec") },
     { Name = "FlagTest", Func = require("../Tests/FlagTest.spec") },
+    { Name = "LauncherTest", Func = require("../Tests/LauncherTest.spec") },
     { Name = "StringUtilsTest", Func = require("../Tests/StringUtilsTest.spec") },
+    { Name = "ToolkitLauncherTest", Func = require("../Tests/ToolkitLauncherTest.spec") },
     { Name = "ToolkitTest", Func = require("../Tests/ToolkitTest.spec") },
     { Name = "TypeUtilsTest", Func = require("../Tests/TypeUtilsTest.spec") },
 }
