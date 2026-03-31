@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0
+- Add Launcher module for generating launcher executable source code
+- Add Toolkit.buildLauncher() for building thin launcher binaries
+- Add Toolkit.installCommand() for self-install subcommands with PATH configuration
+- Add Toolkit.updateCommand() for self-update subcommands with version management
+- Bump lune to 0.10.4-horse.14.2
+
 ## 0.0.16
 - Add file headers to auto-generated version modules
 - Bump lune to 0.10.4-horse.14.1
