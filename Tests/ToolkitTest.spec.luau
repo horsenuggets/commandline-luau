@@ -117,7 +117,7 @@ return function()
 
         it("should default to VERSION in current directory", function()
             local tempDir = createTempDir()
-            local originalCwd = process.cwd
+            local _originalCwd = process.cwd
             writeFile(tempDir, "VERSION", "3.0.0\n")
 
             -- generateVersion with no VersionFile should look for "VERSION"
@@ -324,7 +324,7 @@ return function()
             writeFile(tempDir, "Source/MyCli/data.json", '{"require": "@self/test"}')
             writeFile(tempDir, "Source/MyCli/init.luau", "return {}\n")
 
-            local backups = Toolkit._patchRelativeRequires(tempDir, {
+            local _backups = Toolkit._patchRelativeRequires(tempDir, {
                 { alias = "@mycli", dir = "Source/MyCli" },
             })
 
