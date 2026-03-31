@@ -475,17 +475,10 @@ function Toolkit.installCompletions(options: {
 end
 
 ------------------------------------------------------------------------------------------
--- Launcher, Install, and Update
+-- Install and Update (Direct Binary Replacement)
 ------------------------------------------------------------------------------------------
 
-local Launcher = require("@self/Launcher")
-
-local launcherOptionsCheck = t.interface({
-    Name = t.string,
-    InstallDir = t.string,
-    Target = t.optional(t.string),
-    OutputDir = t.optional(t.string),
-})
+local SelfUpdate = require("@self/SelfUpdate")
 
 local installOptionsCheck = t.interface({
     Name = t.string,
@@ -495,68 +488,15 @@ local installOptionsCheck = t.interface({
 })
 
 --[[
-    Builds a thin launcher executable that delegates to a versioned
-    CLI binary. The launcher reads ~/.{installDir}/current to find
-    the active version and execs the real binary from the versions
-    directory.
+    Returns a Command for an "install" subcommand that downloads the
+    CLI binary to a dedicated directory and adds it to PATH.
 
-    Options:
-    > Name - CLI binary name (e.g., "rbxstudio")
-    > InstallDir - Install directory name (e.g., ".rbxstudio-cli")
-    > Target - Cross-compile target (e.g., "linux-x86_64")
-    > OutputDir - Output directory (default "Build")
-]]
-function Toolkit.buildLauncher(options: {
-    Name: string,
-    InstallDir: string,
-    Target: string?,
-    OutputDir: string?,
-})
-    assert(launcherOptionsCheck(options))
+    Directory structure:
+    > ~/{installDir}/bin/{name}  (the binary)
 
-    local outputDir = options.OutputDir or "Build"
-    local launcherName = options.Name .. "-launcher"
-
-    -- Generate the launcher source
-    local source = Launcher.generate({
-        Name = options.Name,
-        InstallDir = options.InstallDir,
-    })
-
-    -- Write temporary launcher source file
-    if not fs.isDir(outputDir) then
-        fs.writeDir(outputDir)
-    end
-
-    local tempSource = outputDir .. "/_launcher.luau"
-    fs.writeFile(tempSource, source)
-
-    -- Build using Toolkit.build
-    Toolkit.build({
-        Name = launcherName,
-        EntryPoint = tempSource,
-        OutputDir = outputDir,
-        Target = options.Target,
-    })
-
-    -- Clean up temp source
-    if fs.isFile(tempSource) then
-        fs.removeFile(tempSource)
-    end
-end
-
---[[
-    Returns a Command for an "install" subcommand that sets up the
-    versioned directory structure:
-
-    ~/.{installDir}/
-    > bin/{name}            (launcher binary)
-    > versions/{name}-X.Y.Z (real CLI binary)
-    > current               (text file with current version)
-
-    Downloads the launcher from a GitHub release, copies the current
-    executable to the versions directory, configures PATH, and sets
-    the current version pointer.
+    The install command downloads the platform-appropriate binary from
+    the latest GitHub release and configures the user's shell to
+    include the bin directory on PATH.
 
     Options:
     > Name - CLI binary name (e.g., "rbxstudio")
@@ -585,8 +525,6 @@ function Toolkit.installCommand(options: {
     local HOME_DIR = if IS_WINDOWS then process.env.USERPROFILE or "" else process.env.HOME or ""
     local INSTALL_PATH = HOME_DIR .. "/" .. installDir
     local BIN_DIR = INSTALL_PATH .. "/bin"
-    local VERSIONS_DIR = INSTALL_PATH .. "/versions"
-    local CURRENT_FILE = INSTALL_PATH .. "/current"
     local EXECUTABLE_SUFFIX = if IS_WINDOWS then ".exe" else ""
     local PATH_EXPORT_COMMENT = "# Added by " .. name
     local PATH_EXPORT_LINE = `export PATH="{BIN_DIR}:$PATH"`
@@ -597,41 +535,13 @@ function Toolkit.installCommand(options: {
     }
     local XSH_PATH_FILE = HOME_DIR .. "/.path"
 
-    local function normalizePath(path: string): string
-        if IS_WINDOWS then
-            local normalized = path:gsub("/", "\\")
-            local prefix = ""
-            if normalized:sub(1, 2) == "\\\\" then
-                prefix = "\\\\"
-                normalized = normalized:sub(3)
-            end
-            return prefix .. normalized:gsub("\\\\+", "\\")
-        else
-            return path:gsub("//+", "/")
-        end
-    end
-
-    local function ensureDirectory(path: string)
-        if not fs.isDir(normalizePath(path)) then
-            fs.writeDir(normalizePath(path))
-        end
-    end
-
-    local function getPlatformSuffix(): string
-        local os = process.os
-        if os == "macos" or os == "darwin" then
-            os = "macos"
-        end
-        local arch = process.arch
-        if arch == "arm64" then
-            arch = "aarch64"
-        end
-        return `{os}-{arch}`
-    end
-
-    local function downloadAsset(assetName: string, destPath: string): boolean
+    local function downloadLatestBinary(destPath: string): boolean
         local url = `https://api.github.com/repos/{repository}/releases/latest`
-        local ok, response = pcall(net.request, { url = url, method = "GET" })
+        local ok, response = pcall(net.request, {
+            url = url,
+            method = "GET",
+            headers = { ["User-Agent"] = name },
+        })
 
         if not ok or not response.ok then
             print(Chalk.red("Failed to fetch latest release."))
@@ -644,7 +554,10 @@ function Toolkit.installCommand(options: {
             return false
         end
 
+        local platformSuffix = SelfUpdate.getPlatformSuffix()
+        local assetName = `{name}-{platformSuffix}{EXECUTABLE_SUFFIX}`
         local downloadUrl: string? = nil
+
         for _, asset in release.assets or {} do
             if asset.name == assetName then
                 downloadUrl = asset.browser_download_url
@@ -660,17 +573,17 @@ function Toolkit.installCommand(options: {
         local dlOk, dlResponse = pcall(net.request, {
             url = downloadUrl,
             method = "GET",
+            headers = { ["User-Agent"] = name },
         })
 
         if not dlOk or not dlResponse.ok then
-            print(Chalk.red("Failed to download asset."))
+            print(Chalk.red("Failed to download binary."))
             return false
         end
 
-        fs.writeFile(normalizePath(destPath), dlResponse.body)
-
+        fs.writeFile(destPath, dlResponse.body)
         if not IS_WINDOWS then
-            process.exec("chmod", { "+x", normalizePath(destPath) })
+            process.exec("chmod", { "+x", destPath })
         end
 
         return true
@@ -678,7 +591,6 @@ function Toolkit.installCommand(options: {
 
     local function addToPath()
         if IS_WINDOWS then
-            -- Add to user PATH via PowerShell
             local psCmd = "$p = [Environment]::GetEnvironmentVariable('PATH','User');"
                 .. " if ($p -notlike '*"
                 .. BIN_DIR
@@ -693,14 +605,14 @@ function Toolkit.installCommand(options: {
         end
 
         -- Check for xsh-compatible .path file
-        if fs.isFile(normalizePath(XSH_PATH_FILE)) then
-            local content = fs.readFile(normalizePath(XSH_PATH_FILE))
+        if fs.isFile(XSH_PATH_FILE) then
+            local content = fs.readFile(XSH_PATH_FILE)
             if not string.find(content, BIN_DIR, 1, true) then
                 if content ~= "" and not string.match(content, "\n$") then
                     content ..= "\n"
                 end
                 content ..= BIN_DIR .. "\n"
-                fs.writeFile(normalizePath(XSH_PATH_FILE), content)
+                fs.writeFile(XSH_PATH_FILE, content)
                 print(`Added {Chalk.dim(BIN_DIR)} to {Chalk.dim("~/.path")}.`)
             end
             return
@@ -708,7 +620,7 @@ function Toolkit.installCommand(options: {
 
         -- Fall back to shell config files
         for _, config in SHELL_CONFIGS do
-            local configPath = normalizePath(`{HOME_DIR}/{config.file}`)
+            local configPath = `{HOME_DIR}/{config.file}`
             if fs.isFile(configPath) then
                 local content = fs.readFile(configPath)
                 if not string.find(content, PATH_EXPORT_COMMENT, 1, true) then
@@ -731,53 +643,33 @@ function Toolkit.installCommand(options: {
             print()
 
             -- Create directory structure
-            ensureDirectory(INSTALL_PATH)
-            ensureDirectory(BIN_DIR)
-            ensureDirectory(VERSIONS_DIR)
-
-            -- Copy current executable to versions directory
-            local versionedName = `{name}-{version}{EXECUTABLE_SUFFIX}`
-            local versionedPath = normalizePath(`{VERSIONS_DIR}/{versionedName}`)
-
-            -- Find the current executable path
-            local executablePath: string? = nil
-            local result = process.exec(if IS_WINDOWS then "where" else "which", { name })
-            if result.ok then
-                executablePath = result.stdout:match("^%s*(.-)%s*$")
+            if not fs.isDir(INSTALL_PATH) then
+                fs.writeDir(INSTALL_PATH)
+            end
+            if not fs.isDir(BIN_DIR) then
+                fs.writeDir(BIN_DIR)
             end
 
-            if executablePath and fs.isFile(executablePath) then
-                local contents = fs.readFile(executablePath)
-                fs.writeFile(versionedPath, contents)
+            local binaryPath = `{BIN_DIR}/{name}{EXECUTABLE_SUFFIX}`
+
+            -- Try to copy current running binary first
+            local currentExe = SelfUpdate.findExecutable(name)
+            if currentExe then
+                local contents = fs.readFile(currentExe)
+                fs.writeFile(binaryPath, contents)
                 if not IS_WINDOWS then
-                    process.exec("chmod", { "+x", versionedPath })
+                    process.exec("chmod", { "+x", binaryPath })
                 end
-                print(`Copied executable to {Chalk.dim(versionedPath)}.`)
+                print(`Copied executable to {Chalk.dim(binaryPath)}.`)
             else
-                print(Chalk.yellow("Could not find current executable. Downloading..."))
-                local platformSuffix = getPlatformSuffix()
-                local assetName = `{name}-{platformSuffix}{EXECUTABLE_SUFFIX}`
-                if not downloadAsset(assetName, versionedPath) then
-                    print(Chalk.red("Failed to download executable."))
+                -- Download from GitHub releases
+                print("Downloading binary...")
+                if not downloadLatestBinary(binaryPath) then
+                    print(Chalk.red("Failed to install. Could not download binary."))
                     process.exit(1)
                 end
-                print(`Downloaded {Chalk.dim(assetName)}.`)
+                print("Downloaded successfully.")
             end
-
-            -- Download launcher to bin directory
-            print("Downloading launcher...")
-            local platformSuffix = getPlatformSuffix()
-            local launcherAssetName = `{name}-launcher-{platformSuffix}{EXECUTABLE_SUFFIX}`
-            local launcherPath = normalizePath(`{BIN_DIR}/{name}{EXECUTABLE_SUFFIX}`)
-
-            if not downloadAsset(launcherAssetName, launcherPath) then
-                print(Chalk.red("Failed to download launcher."))
-                process.exit(1)
-            end
-
-            -- Write current version pointer
-            fs.writeFile(normalizePath(CURRENT_FILE), version)
-            print(`Set current version to {Chalk.bold(Chalk.blueBright(version))}.`)
 
             -- Add to PATH
             addToPath()
@@ -791,8 +683,13 @@ end
 
 --[[
     Returns a Command for an "update" subcommand that downloads the
-    latest (or a specified) version from GitHub releases and updates
-    the current version pointer.
+    latest (or a specified) version from GitHub releases and replaces
+    the current binary in-place.
+
+    Uses SelfUpdate.replaceBinary() for atomic cross-platform binary
+    replacement:
+    > Unix - Unlink and replace (kernel keeps old inode alive)
+    > Windows - Rename to .old, write new, clean up .old on next run
 
     Options:
     > Name - CLI binary name (e.g., "rbxstudio")
@@ -814,42 +711,11 @@ function Toolkit.updateCommand(options: {
     local serde = require("@lune/serde")
 
     local name = options.Name
-    local installDir = options.InstallDir
     local currentVersion = options.Version
     local repository = options.Repository
 
     local IS_WINDOWS = process.os == "windows"
-    local HOME_DIR = if IS_WINDOWS then process.env.USERPROFILE or "" else process.env.HOME or ""
-    local INSTALL_PATH = HOME_DIR .. "/" .. installDir
-    local VERSIONS_DIR = INSTALL_PATH .. "/versions"
-    local CURRENT_FILE = INSTALL_PATH .. "/current"
     local EXECUTABLE_SUFFIX = if IS_WINDOWS then ".exe" else ""
-
-    local function normalizePath(path: string): string
-        if IS_WINDOWS then
-            local normalized = path:gsub("/", "\\")
-            local prefix = ""
-            if normalized:sub(1, 2) == "\\\\" then
-                prefix = "\\\\"
-                normalized = normalized:sub(3)
-            end
-            return prefix .. normalized:gsub("\\\\+", "\\")
-        else
-            return path:gsub("//+", "/")
-        end
-    end
-
-    local function getPlatformSuffix(): string
-        local os = process.os
-        if os == "macos" or os == "darwin" then
-            os = "macos"
-        end
-        local arch = process.arch
-        if arch == "arm64" then
-            arch = "aarch64"
-        end
-        return `{os}-{arch}`
-    end
 
     local function getRelease(targetVersion: string?): { version: string, assets: { any } }?
         local url: string
@@ -859,7 +725,11 @@ function Toolkit.updateCommand(options: {
             url = `https://api.github.com/repos/{repository}/releases/latest`
         end
 
-        local ok, response = pcall(net.request, { url = url, method = "GET" })
+        local ok, response = pcall(net.request, {
+            url = url,
+            method = "GET",
+            headers = { ["User-Agent"] = name },
+        })
         if not ok or not response.ok then
             return nil
         end
@@ -889,6 +759,12 @@ function Toolkit.updateCommand(options: {
         Impl = function(args)
             local targetVersion = args.version
 
+            -- Clean up leftover .old file from previous Windows update
+            local currentExe = SelfUpdate.findExecutable(name)
+            if currentExe then
+                SelfUpdate.cleanupOldBinary(currentExe)
+            end
+
             print(`Checking for updates to {Chalk.bold(Chalk.blueBright(name))}...`)
 
             local release = getRelease(targetVersion)
@@ -911,8 +787,8 @@ function Toolkit.updateCommand(options: {
 
             print(`Updating from {Chalk.dim(currentVersion)} to {Chalk.bold(Chalk.blueBright(newVersion))}...`)
 
-            -- Download the new version binary
-            local platformSuffix = getPlatformSuffix()
+            -- Find download URL for current platform
+            local platformSuffix = SelfUpdate.getPlatformSuffix()
             local assetName = `{name}-{platformSuffix}{EXECUTABLE_SUFFIX}`
             local downloadUrl: string? = nil
 
@@ -928,9 +804,11 @@ function Toolkit.updateCommand(options: {
                 process.exit(1)
             end
 
+            -- Download new binary
             local dlOk, dlResponse = pcall(net.request, {
                 url = downloadUrl,
                 method = "GET",
+                headers = { ["User-Agent"] = name },
             })
 
             if not dlOk or not dlResponse.ok then
@@ -938,20 +816,16 @@ function Toolkit.updateCommand(options: {
                 process.exit(1)
             end
 
-            -- Save to versions directory
-            local versionedPath = normalizePath(`{VERSIONS_DIR}/{name}-{newVersion}{EXECUTABLE_SUFFIX}`)
-
-            if not fs.isDir(normalizePath(VERSIONS_DIR)) then
-                fs.writeDir(normalizePath(VERSIONS_DIR))
+            -- Replace the current binary in-place
+            if currentExe then
+                SelfUpdate.replaceBinary({
+                    targetPath = currentExe,
+                    newContents = dlResponse.body,
+                })
+            else
+                print(Chalk.red(`Could not find {name} on PATH. Run "{name} install" first.`))
+                process.exit(1)
             end
-
-            fs.writeFile(versionedPath, dlResponse.body)
-            if not IS_WINDOWS then
-                process.exec("chmod", { "+x", versionedPath })
-            end
-
-            -- Update version pointer
-            fs.writeFile(normalizePath(CURRENT_FILE), newVersion)
 
             print()
             print(Chalk.bold(Chalk.greenBright(`Updated to {newVersion}!`)))
@@ -962,5 +836,6 @@ end
 -- Exposed for testing
 Toolkit._patchRelativeRequires = patchRelativeRequires
 Toolkit._restoreFiles = restoreFiles
+Toolkit._SelfUpdate = SelfUpdate
 
 return Toolkit
