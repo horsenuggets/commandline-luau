@@ -16,6 +16,8 @@ local StringUtils = require("@self/Helpers/StringUtils")
 local Toolkit = require("@self/Toolkit")
 local t = require("@packages/t")
 
+local Launcher = require("@self/Launcher")
+
 local Commandline = {
     -- Public static properties
     Arg = Arg,
