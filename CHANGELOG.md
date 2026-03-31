@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0
+- Replace launcher pattern with Deno-style direct binary self-replacement
+- Add SelfUpdate module for cross-platform atomic binary replacement
+- Rewrite Toolkit.installCommand() to download binary directly (no launcher)
+- Rewrite Toolkit.updateCommand() to replace binary in-place via SelfUpdate
+- Remove Launcher module and Toolkit.buildLauncher()
+
 ## 0.1.0
 - Add Launcher module for generating launcher executable source code
 - Add Toolkit.buildLauncher() for building thin launcher binaries
