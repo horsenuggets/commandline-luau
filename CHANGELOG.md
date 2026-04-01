@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+- Remove Windows require patching workaround (AliasDirs, patchRelativeRequires)
+- Lune now handles relative path resolution correctly in compiled executables
+
 ## 0.2.0
 - Replace launcher pattern with Deno-style direct binary self-replacement
 - Add SelfUpdate module for cross-platform atomic binary replacement

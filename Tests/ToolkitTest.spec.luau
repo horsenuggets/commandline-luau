@@ -2,9 +2,9 @@
 
 ToolkitTest.spec
 
-Tests for the Toolkit build utilities. Covers version generation, require patching,
-executable building, and completions command creation. Tests use isolated temp
-directories for parallelism.
+Tests for the Toolkit build utilities. Covers version generation, executable
+building, and completions command creation. Tests use isolated temp directories
+for parallelism.
 
 --]]
 
@@ -117,7 +117,7 @@ return function()
 
         it("should default to VERSION in current directory", function()
             local tempDir = createTempDir()
-            local originalCwd = process.cwd
+            local _originalCwd = process.cwd
             writeFile(tempDir, "VERSION", "3.0.0\n")
 
             -- generateVersion with no VersionFile should look for "VERSION"
@@ -129,207 +129,6 @@ return function()
             expect(readFile(tempDir, "out.luau")).to.equal(
                 '--[[\n\n__VERSION__\n\nAuto-generated version module.\n\n--]]\n\nreturn "3.0.0"\n'
             )
-            cleanup(tempDir)
-        end)
-    end)
-
-    describe("require patching", function()
-        it("should patch @self requires to alias paths", function()
-            local tempDir = createTempDir()
-            writeFile(tempDir, "Source/MyCli/init.luau", 'local Foo = require("@self/Helpers/Foo")\nreturn {}\n')
-            writeFile(tempDir, "Source/MyCli/Helpers/Foo.luau", "return {}\n")
-
-            local backups = Toolkit._patchRelativeRequires(tempDir, {
-                { alias = "@mycli", dir = "Source/MyCli" },
-            })
-
-            local patched = readFile(tempDir, "Source/MyCli/init.luau")
-            expect(string.find(patched, "@mycli/Helpers/Foo")).to.be.ok()
-            expect(string.find(patched, "@self")).to.equal(nil)
-
-            Toolkit._restoreFiles(backups)
-            local restored = readFile(tempDir, "Source/MyCli/init.luau")
-            expect(string.find(restored, "@self/Helpers/Foo")).to.be.ok()
-            cleanup(tempDir)
-        end)
-
-        it("should patch ./ relative requires to alias paths", function()
-            local tempDir = createTempDir()
-            writeFile(tempDir, "Source/MyCli/Helpers/Bar.luau", 'local Baz = require("./Baz")\nreturn {}\n')
-            writeFile(tempDir, "Source/MyCli/Helpers/Baz.luau", "return {}\n")
-
-            local backups = Toolkit._patchRelativeRequires(tempDir, {
-                { alias = "@mycli", dir = "Source/MyCli" },
-            })
-
-            local patched = readFile(tempDir, "Source/MyCli/Helpers/Bar.luau")
-            expect(string.find(patched, "@mycli/Helpers/Baz")).to.be.ok()
-            expect(string.find(patched, '"./')).to.equal(nil)
-
-            Toolkit._restoreFiles(backups)
-            cleanup(tempDir)
-        end)
-
-        it("should patch ../ relative requires to alias paths", function()
-            local tempDir = createTempDir()
-            writeFile(tempDir, "Source/MyCli/Sub/Deep.luau", 'local Root = require("../Root")\nreturn {}\n')
-            writeFile(tempDir, "Source/MyCli/Root.luau", "return {}\n")
-
-            local backups = Toolkit._patchRelativeRequires(tempDir, {
-                { alias = "@mycli", dir = "Source/MyCli" },
-            })
-
-            local patched = readFile(tempDir, "Source/MyCli/Sub/Deep.luau")
-            expect(string.find(patched, "@mycli/Root")).to.be.ok()
-            expect(string.find(patched, '".%./')).to.equal(nil)
-
-            Toolkit._restoreFiles(backups)
-            cleanup(tempDir)
-        end)
-
-        it("should handle multiple requires in one file", function()
-            local tempDir = createTempDir()
-            -- @self in Sub/init.luau resolves relative to Sub/
-            local content = table.concat({
-                'local A = require("@self/A")',
-                'local B = require("./B")',
-                'local C = require("../Root")',
-                "return {}",
-            }, "\n")
-            writeFile(tempDir, "Source/MyCli/Sub/init.luau", content)
-            writeFile(tempDir, "Source/MyCli/Sub/A.luau", "return {}\n")
-            writeFile(tempDir, "Source/MyCli/Sub/B.luau", "return {}\n")
-            writeFile(tempDir, "Source/MyCli/Root.luau", "return {}\n")
-
-            local backups = Toolkit._patchRelativeRequires(tempDir, {
-                { alias = "@mycli", dir = "Source/MyCli" },
-            })
-
-            local patched = readFile(tempDir, "Source/MyCli/Sub/init.luau")
-            -- @self/A from Sub/init.luau -> Source/MyCli/Sub/A
-            expect(string.find(patched, "@mycli/Sub/A")).to.be.ok()
-            -- ./B from Sub/init.luau -> Source/MyCli/Sub/B
-            expect(string.find(patched, "@mycli/Sub/B")).to.be.ok()
-            -- ../Root from Sub/init.luau -> Source/MyCli/Root
-            expect(string.find(patched, "@mycli/Root")).to.be.ok()
-            expect(string.find(patched, "@self")).to.equal(nil)
-            expect(string.find(patched, '"./')).to.equal(nil)
-
-            Toolkit._restoreFiles(backups)
-            cleanup(tempDir)
-        end)
-
-        it("should not modify files outside alias directories", function()
-            local tempDir = createTempDir()
-            writeFile(tempDir, "other/file.luau", 'local X = require("./X")\nreturn {}\n')
-
-            local backups = Toolkit._patchRelativeRequires(tempDir, {
-                { alias = "@mycli", dir = "Source/MyCli" },
-            })
-
-            expect(#backups).to.equal(0)
-            local content = readFile(tempDir, "other/file.luau")
-            expect(string.find(content, '"./X"')).to.be.ok()
-            cleanup(tempDir)
-        end)
-
-        it("should not modify requires that are already aliased", function()
-            local tempDir = createTempDir()
-            writeFile(tempDir, "Source/MyCli/init.luau", 'local P = require("@packages/Chalk")\nreturn {}\n')
-
-            local backups = Toolkit._patchRelativeRequires(tempDir, {
-                { alias = "@mycli", dir = "Source/MyCli" },
-                { alias = "@packages", dir = "Packages" },
-            })
-
-            expect(#backups).to.equal(0)
-            local content = readFile(tempDir, "Source/MyCli/init.luau")
-            expect(string.find(content, "@packages/Chalk")).to.be.ok()
-            cleanup(tempDir)
-        end)
-
-        it("should restore all files after patching", function()
-            local tempDir = createTempDir()
-            local original1 = 'local A = require("@self/A")\nreturn {}\n'
-            local original2 = 'local B = require("./B")\nreturn {}\n'
-            writeFile(tempDir, "Source/MyCli/init.luau", original1)
-            writeFile(tempDir, "Source/MyCli/Sub/File.luau", original2)
-            writeFile(tempDir, "Source/MyCli/A.luau", "return {}\n")
-            writeFile(tempDir, "Source/MyCli/Sub/B.luau", "return {}\n")
-
-            local backups = Toolkit._patchRelativeRequires(tempDir, {
-                { alias = "@mycli", dir = "Source/MyCli" },
-            })
-
-            expect(#backups).to.equal(2)
-
-            Toolkit._restoreFiles(backups)
-
-            expect(readFile(tempDir, "Source/MyCli/init.luau")).to.equal(original1)
-            expect(readFile(tempDir, "Source/MyCli/Sub/File.luau")).to.equal(original2)
-            cleanup(tempDir)
-        end)
-
-        it("should delete .luaurc files in Packages/_Index", function()
-            local tempDir = createTempDir()
-            writeFile(tempDir, "Source/MyCli/init.luau", "return {}\n")
-            writeFile(tempDir, "Packages/_Index/some-pkg/.luaurc", '{"aliases":{}}')
-
-            local backups = Toolkit._patchRelativeRequires(tempDir, {
-                { alias = "@mycli", dir = "Source/MyCli" },
-            })
-
-            expect(fs.isFile(tempDir .. "/Packages/_Index/some-pkg/.luaurc")).to.equal(false)
-
-            Toolkit._restoreFiles(backups)
-            expect(fs.isFile(tempDir .. "/Packages/_Index/some-pkg/.luaurc")).to.equal(true)
-            cleanup(tempDir)
-        end)
-
-        it("should handle deeply nested .luaurc files in packages", function()
-            local tempDir = createTempDir()
-            writeFile(tempDir, "Source/MyCli/init.luau", "return {}\n")
-            writeFile(tempDir, "Packages/_Index/pkg-a/a/.luaurc", '{"aliases":{}}')
-            writeFile(tempDir, "Packages/_Index/pkg-b/b/sub/.luaurc", '{"aliases":{}}')
-
-            local backups = Toolkit._patchRelativeRequires(tempDir, {
-                { alias = "@mycli", dir = "Source/MyCli" },
-            })
-
-            expect(fs.isFile(tempDir .. "/Packages/_Index/pkg-a/a/.luaurc")).to.equal(false)
-            expect(fs.isFile(tempDir .. "/Packages/_Index/pkg-b/b/sub/.luaurc")).to.equal(false)
-
-            Toolkit._restoreFiles(backups)
-            expect(fs.isFile(tempDir .. "/Packages/_Index/pkg-a/a/.luaurc")).to.equal(true)
-            expect(fs.isFile(tempDir .. "/Packages/_Index/pkg-b/b/sub/.luaurc")).to.equal(true)
-            cleanup(tempDir)
-        end)
-
-        it("should handle files with no requires", function()
-            local tempDir = createTempDir()
-            local content = "local x = 42\nreturn x\n"
-            writeFile(tempDir, "Source/MyCli/NoRequires.luau", content)
-
-            local backups = Toolkit._patchRelativeRequires(tempDir, {
-                { alias = "@mycli", dir = "Source/MyCli" },
-            })
-
-            expect(#backups).to.equal(0)
-            expect(readFile(tempDir, "Source/MyCli/NoRequires.luau")).to.equal(content)
-            cleanup(tempDir)
-        end)
-
-        it("should only patch .luau files, not other extensions", function()
-            local tempDir = createTempDir()
-            writeFile(tempDir, "Source/MyCli/data.json", '{"require": "@self/test"}')
-            writeFile(tempDir, "Source/MyCli/init.luau", "return {}\n")
-
-            local backups = Toolkit._patchRelativeRequires(tempDir, {
-                { alias = "@mycli", dir = "Source/MyCli" },
-            })
-
-            local jsonContent = readFile(tempDir, "Source/MyCli/data.json")
-            expect(string.find(jsonContent, "@self/test")).to.be.ok()
             cleanup(tempDir)
         end)
     end)
@@ -434,58 +233,6 @@ return function()
             local result = process.exec(tempDir .. "/out/old-binary", {})
             expect(result.ok).to.equal(true)
             expect(string.find(result.stdout, "v2")).to.be.ok()
-            cleanup(tempDir)
-        end)
-
-        it("should apply require patching when AliasDirs is provided", function()
-            local tempDir = createTempDir()
-            writeFile(
-                tempDir,
-                "Source/App/init.luau",
-                table.concat({
-                    'local Helper = require("@self/Helper")',
-                    "print(Helper.greet())",
-                }, "\n")
-            )
-            writeFile(
-                tempDir,
-                "Source/App/Helper.luau",
-                table.concat({
-                    "local Helper = {}",
-                    "function Helper.greet()",
-                    '    return "patched-build"',
-                    "end",
-                    "return Helper",
-                }, "\n")
-            )
-            writeFile(
-                tempDir,
-                ".luaurc",
-                table.concat({
-                    "{",
-                    '    "aliases": {',
-                    '        "app": "./Source/App/"',
-                    "    }",
-                    "}",
-                }, "\n")
-            )
-
-            Toolkit.build({
-                Name = "patched-app",
-                EntryPoint = tempDir .. "/Source/App",
-                OutputDir = tempDir .. "/out",
-                AliasDirs = {
-                    { alias = "@app", dir = "Source/App" },
-                },
-            })
-
-            -- Verify source files were restored (not left patched)
-            local sourceContent = readFile(tempDir, "Source/App/init.luau")
-            expect(string.find(sourceContent, "@self/Helper")).to.be.ok()
-
-            -- Verify binary works
-            local binaryPath = tempDir .. "/out/patched-app"
-            expect(fs.isFile(binaryPath)).to.equal(true)
             cleanup(tempDir)
         end)
 
