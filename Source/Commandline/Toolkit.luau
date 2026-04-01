@@ -3,8 +3,8 @@
 Toolkit
 
 Build and install utilities for creating standalone CLI executables from Commandline
-apps. Provides functions for building executables, generating version modules,
-enabling shell completions, and patching requires for cross-platform compatibility.
+apps. Provides functions for building executables, generating version modules, and
+enabling shell completions.
 
 --]]
 
@@ -24,156 +24,12 @@ local buildOptionsCheck = t.interface({
     EntryPoint = t.string,
     OutputDir = t.optional(t.string),
     Target = t.optional(t.string),
-    AliasDirs = t.optional(t.array(t.interface({
-        alias = t.string,
-        dir = t.string,
-    }))),
 })
 
 local generateVersionCheck = t.interface({
     VersionFile = t.optional(t.string),
     OutputPath = t.string,
 })
-
-------------------------------------------------------------------------------------------
--- Cross-platform require patching
-------------------------------------------------------------------------------------------
-
--- Compiled Lune executables on Windows resolve relative paths ("./", "../",
--- "@self/") against the drive root instead of the virtual filesystem, breaking
--- requires at runtime. This patches all relative requires to use alias paths
--- which go through Lune's alias resolution and work correctly on all platforms.
-
-type FileBackup = { path: string, content: string }
-
-local function getParentDir(path: string): string
-    return path:match("^(.*)/[^/]+$") or ""
-end
-
-local function resolveAlias(projectRelPath: string, aliasDirs: { { alias: string, dir: string } }): (string?, string?)
-    for _, entry in aliasDirs do
-        local prefix = entry.dir .. "/"
-        if string.sub(projectRelPath, 1, #prefix) == prefix then
-            local rest = string.sub(projectRelPath, #prefix + 1)
-            return entry.alias, rest
-        end
-    end
-    return nil
-end
-
-local function patchRelativeRequires(projectRoot: string, aliasDirs: { { alias: string, dir: string } }): { FileBackup }
-    local backups: { FileBackup } = {}
-    local patched = 0
-
-    local function processFile(filePath: string, projectRelPath: string)
-        local content = fs.readFile(filePath)
-        local originalContent = content
-        local modified = false
-        local fileDir = getParentDir(projectRelPath)
-
-        -- Replace @self requires (used in init.luau files, @self = containing
-        -- directory)
-        if string.find(content, "@self/", 1, true) then
-            local selfDir = fileDir
-            content = string.gsub(content, 'require%("@self/([^"]+)"', function(target)
-                local fullPath = if selfDir == "" then target else selfDir .. "/" .. target
-                local alias, rest = resolveAlias(fullPath, aliasDirs)
-                if alias then
-                    modified = true
-                    return 'require("' .. alias .. "/" .. rest .. '"'
-                end
-                return nil
-            end)
-        end
-
-        -- Replace "./" relative requires
-        if string.find(content, 'require("./', 1, true) then
-            content = string.gsub(content, 'require%("(%./[^"]+)"', function(relTarget)
-                local target = string.sub(relTarget, 3)
-                local fullPath = if fileDir == "" then target else fileDir .. "/" .. target
-                local alias, rest = resolveAlias(fullPath, aliasDirs)
-                if alias then
-                    modified = true
-                    return 'require("' .. alias .. "/" .. rest .. '"'
-                end
-                return nil
-            end)
-        end
-
-        -- Replace "../" relative requires
-        if string.find(content, 'require("../', 1, true) then
-            content = string.gsub(content, 'require%("(%.%./[^"]+)"', function(relTarget)
-                local target = string.sub(relTarget, 4)
-                local parentDir = getParentDir(fileDir)
-                local fullPath = if parentDir == "" then target else parentDir .. "/" .. target
-                local alias, rest = resolveAlias(fullPath, aliasDirs)
-                if alias then
-                    modified = true
-                    return 'require("' .. alias .. "/" .. rest .. '"'
-                end
-                return nil
-            end)
-        end
-
-        if modified then
-            table.insert(backups, { path = filePath, content = originalContent })
-            fs.writeFile(filePath, content)
-            patched += 1
-        end
-    end
-
-    local function processDir(dirPath: string, projectRelPrefix: string)
-        for _, entry in fs.readDir(dirPath) do
-            local fullPath = dirPath .. "/" .. entry
-            local relPath = if projectRelPrefix == "" then entry else projectRelPrefix .. "/" .. entry
-
-            if fs.isDir(fullPath) then
-                processDir(fullPath, relPath)
-            elseif string.match(entry, "%.luau$") then
-                processFile(fullPath, relPath)
-            end
-        end
-    end
-
-    -- Delete sub-package .luaurc files so @packages falls through to the
-    -- project root definition
-    local function deleteSubLuaurcs(dirPath: string)
-        for _, entry in fs.readDir(dirPath) do
-            local fullPath = dirPath .. "/" .. entry
-            if fs.isDir(fullPath) then
-                deleteSubLuaurcs(fullPath)
-            elseif entry == ".luaurc" then
-                table.insert(backups, { path = fullPath, content = fs.readFile(fullPath) })
-                fs.removeFile(fullPath)
-            end
-        end
-    end
-
-    local packagesIndexDir = projectRoot .. "/Packages/_Index"
-    if fs.isDir(packagesIndexDir) then
-        deleteSubLuaurcs(packagesIndexDir)
-    end
-
-    for _, entry in aliasDirs do
-        local dirPath = projectRoot .. "/" .. entry.dir
-        if fs.isDir(dirPath) then
-            processDir(dirPath, entry.dir)
-        end
-    end
-
-    if patched > 0 then
-        local label = if patched == 1 then "file" else "files"
-        print("Patched " .. patched .. " " .. label .. " for cross-platform compatibility.")
-    end
-
-    return backups
-end
-
-local function restoreFiles(backups: { FileBackup })
-    for _, backup in backups do
-        fs.writeFile(backup.path, backup.content)
-    end
-end
 
 ------------------------------------------------------------------------------------------
 -- Public API
@@ -224,16 +80,12 @@ end
     > OutputDir - Directory to write the binary (default "Build")
     > Target - Cross-compile target (e.g., "linux-x86_64"). Nil for current
     >   platform.
-    > AliasDirs - Array of { alias, dir } for cross-platform require patching.
-    >   If provided, relative requires (@self, ./, ../) are rewritten to alias
-    >   paths before building and restored after.
 ]]
 function Toolkit.build(options: {
     Name: string,
     EntryPoint: string,
     OutputDir: string?,
     Target: string?,
-    AliasDirs: { { alias: string, dir: string } }?,
 })
     assert(buildOptionsCheck(options))
 
@@ -248,12 +100,6 @@ function Toolkit.build(options: {
     if not fs.isDir(entryPoint) and not fs.isFile(entryPoint) then
         print(Chalk.red('Entry point "' .. entryPoint .. '" not found.'))
         process.exit(1)
-    end
-
-    -- Patch relative requires for cross-platform compatibility
-    local backups: { FileBackup } = {}
-    if options.AliasDirs then
-        backups = patchRelativeRequires(".", options.AliasDirs)
     end
 
     -- Ensure output directory exists
@@ -299,11 +145,10 @@ function Toolkit.build(options: {
 
     local result = process.exec("lune", args)
 
-    -- Clean up temp file and restore patched files
+    -- Clean up temp file
     if tempFile and fs.isFile(tempFile) then
         fs.removeFile(tempFile)
     end
-    restoreFiles(backups)
 
     if result.ok then
         local outputFile = outputPath
@@ -834,8 +679,6 @@ function Toolkit.updateCommand(options: {
 end
 
 -- Exposed for testing
-Toolkit._patchRelativeRequires = patchRelativeRequires
-Toolkit._restoreFiles = restoreFiles
 Toolkit._SelfUpdate = SelfUpdate
 
 return Toolkit
