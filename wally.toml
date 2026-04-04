@@ -1,13 +1,12 @@
 [package]
 name = "horsenuggets/commandline-luau"
 description = "A CLI builder for Luau."
-version = "0.2.2"
+version = "0.2.3"
 license = "MIT"
 realm = "shared"
 registry = "https://github.com/UpliftGames/wally-index"
 repository = "https://github.com/horsenuggets/commandline-luau"
 include = [
-    ".luaurc",
     "default.project.json",
     "init.luau",
     "LICENSE",
@@ -19,8 +18,8 @@ include = [
 exclude = ["**"]
 
 [dependencies]
-Chalk = "horsenuggets/chalk-luau@1.0.0"
-t = "horsenuggets/t@3.1.1-horse.0.3"
+Chalk = "horsenuggets/chalk-luau@1.0.1"
+t = "horsenuggets/t@3.1.1-horse.0.4"
 
 [dev-dependencies]
-Testable = "horsenuggets/testable@1.1.2"
+Testable = "horsenuggets/testable@1.1.3"
