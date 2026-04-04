@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.3
+- Remove .luaurc from Wally package to fix @packages alias resolution in downstream projects
+
 ## 0.2.2
 - Standardize test runner with code coverage
 - Include .luaurc in Wally package
