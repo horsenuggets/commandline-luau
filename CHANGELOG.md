@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+- Standardize test runner with code coverage
+- Include .luaurc in Wally package
+
 ## 0.2.1
 - Remove Windows require patching workaround (AliasDirs, patchRelativeRequires)
 - Lune now handles relative path resolution correctly in compiled executables
