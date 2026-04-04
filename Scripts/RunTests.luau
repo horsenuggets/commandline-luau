@@ -6,28 +6,19 @@ RunTests
 
 Executes all test suites and exits with appropriate status code.
 
-[Usage] ./Scripts/RunTests.luau
-
 --]]
 
 local Testable = require("@devpackages/Testable")
 local process = require("@lune/process")
 
-local TESTS = {
-    { Name = "ArgTest", Func = require("../Tests/ArgTest.spec") },
-    { Name = "CommandTest", Func = require("../Tests/CommandTest.spec") },
-    { Name = "CommandlineTest", Func = require("../Tests/CommandlineTest.spec") },
-    { Name = "CompletionsTest", Func = require("../Tests/CompletionsTest.spec") },
-    { Name = "FlagTest", Func = require("../Tests/FlagTest.spec") },
-    { Name = "SelfUpdateTest", Func = require("../Tests/SelfUpdateTest.spec") },
-    { Name = "StringUtilsTest", Func = require("../Tests/StringUtilsTest.spec") },
-    { Name = "ToolkitInstallTest", Func = require("../Tests/ToolkitInstallTest.spec") },
-    { Name = "ToolkitTest", Func = require("../Tests/ToolkitTest.spec") },
-    { Name = "TypeUtilsTest", Func = require("../Tests/TypeUtilsTest.spec") },
-}
+Testable.configure({
+    Coverage = true,
+    CoverageThreshold = 0,
+    CoverageRoots = script.Parent.Parent.Source,
+})
 
 local function runTests()
-    local _, passed = Testable.run(TESTS)
+    local _, passed = Testable.run(script.Parent.Parent.Tests)
     process.exit(if passed then 0 else 1)
 end
 
