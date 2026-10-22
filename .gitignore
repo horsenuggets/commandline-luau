@@ -28,4 +28,9 @@
 aftman.toml
 
 # Project
+/CONTEXT.md
 /TODO.md
+
+# Worktrees
+/.worktrees/
+/.wt/
