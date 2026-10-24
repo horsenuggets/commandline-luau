@@ -172,11 +172,11 @@ return function()
 
         it("should throw error for invalid Flag options", function()
             expect(function()
-                Flag.new({ InvalidField = "test" })
+                Flag.new({ InvalidField = "test" } :: any)
             end).to.throw()
 
             expect(function()
-                Flag.new("not a table")
+                Flag.new("not a table" :: any)
             end).to.throw()
         end)
 
@@ -184,7 +184,7 @@ return function()
             expect(function()
                 Flag.new({
                     Description = "Missing name",
-                })
+                } :: any)
             end).to.throw()
         end)
 

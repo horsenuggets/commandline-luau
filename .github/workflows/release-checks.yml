@@ -102,7 +102,7 @@ jobs:
         run: lune setup --no-update-luaurc
 
       - name: Run static analysis
-        run: echo "Static analysis temporarily disabled until type issues are resolved"
+        run: ./Submodules/luau-cicd/Scripts/RunStaticAnalysis.exec.luau lune
 
   version:
     name: Validate version

@@ -554,7 +554,7 @@ return function()
             expect(function()
                 Command.new({
                     Name = "test",
-                }):Execute("not a table")
+                }):Execute("not a table" :: any)
             end).to.throw()
         end)
     end)

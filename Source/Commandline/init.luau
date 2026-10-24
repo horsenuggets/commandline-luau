@@ -29,7 +29,7 @@ const Commandline = {
 }
 
 function Commandline.registerCommand(command: Command.Command)
-    assert(t.table(command) and getmetatable(command) == Command, "Invalid command provided.")
+    assert(t.table(command) and getmetatable(command :: any) == Command, "Invalid command provided.")
     assert(not Commandline._commands[command.Name], "Command with this name already registered.")
 
     Commandline._commands[command.Name] = command

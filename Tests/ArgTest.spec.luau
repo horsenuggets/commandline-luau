@@ -169,11 +169,11 @@ return function()
 
         it("should throw error for invalid Arg options", function()
             expect(function()
-                Arg.new({ InvalidField = "test" })
+                Arg.new({ InvalidField = "test" } :: any)
             end).to.throw()
 
             expect(function()
-                Arg.new("not a table")
+                Arg.new("not a table" :: any)
             end).to.throw()
         end)
 
@@ -181,7 +181,7 @@ return function()
             expect(function()
                 Arg.new({
                     Description = "Missing name",
-                })
+                } :: any)
             end).to.throw()
         end)
     end)

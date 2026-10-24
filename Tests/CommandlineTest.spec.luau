@@ -67,11 +67,11 @@ return function()
 
         it("should throw error for invalid command", function()
             expect(function()
-                Commandline.registerCommand("not a command")
+                Commandline.registerCommand("not a command" :: any)
             end).to.throw()
 
             expect(function()
-                Commandline.registerCommand({ Name = "fake" })
+                Commandline.registerCommand({ Name = "fake" } :: any)
             end).to.throw()
         end)
     end)
@@ -219,11 +219,11 @@ return function()
 
         it("should throw error for invalid command string", function()
             expect(function()
-                Commandline.execute(123)
+                Commandline.execute(123 :: any)
             end).to.throw()
 
             expect(function()
-                Commandline.execute({ "not", "a", "string" })
+                Commandline.execute({ "not", "a", "string" } :: any)
             end).to.throw()
         end)
 
