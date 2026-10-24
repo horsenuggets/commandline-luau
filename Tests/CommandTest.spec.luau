@@ -7,14 +7,14 @@ subcommands, and help generation.
 
 --]]
 
-local Arg = require("../Source/Commandline/Arg")
-local Command = require("../Source/Commandline/Command")
-local Flag = require("../Source/Commandline/Flag")
+const Arg = require("../Source/Commandline/Arg")
+const Command = require("../Source/Commandline/Command")
+const Flag = require("../Source/Commandline/Flag")
 
 return function()
     describe("Command.new", function()
         it("should create a basic Command with required fields", function()
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "test",
             })
             expect(cmd).to.be.ok()
@@ -24,7 +24,7 @@ return function()
         end)
 
         it("should create a Command with description and version", function()
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "build",
                 Description = "Build the project",
                 Version = "1.0.0",
@@ -35,7 +35,7 @@ return function()
         end)
 
         it("should automatically add help Flag", function()
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "test",
             })
             expect(#cmd._flags).to.equal(1)
@@ -44,7 +44,7 @@ return function()
         end)
 
         it("should not duplicate help Flag if already provided", function()
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "test",
                 Flags = {
                     Flag.new({
@@ -57,7 +57,7 @@ return function()
         end)
 
         it("should automatically add version Flag when Version is set", function()
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "test",
                 Version = "1.0.0",
             })
@@ -72,7 +72,7 @@ return function()
         end)
 
         it("should not add version Flag when Version is not set", function()
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "test",
             })
             for _, flag in cmd._flags do
@@ -81,7 +81,7 @@ return function()
         end)
 
         it("should not duplicate version Flag if already provided", function()
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "test",
                 Version = "1.0.0",
                 Flags = {
@@ -101,7 +101,7 @@ return function()
         end)
 
         it("should omit version shorthand when -v is already taken", function()
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "test",
                 Version = "1.0.0",
                 Flags = {
@@ -116,17 +116,17 @@ return function()
         end)
 
         it("should convert command name to lowercase", function()
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "TestCommand",
             })
             expect(cmd.Name).to.equal("testcommand")
         end)
 
         it("should allow kebab-case names with single hyphens", function()
-            local cmd = Command.new({ Name = "test-command" })
+            const cmd = Command.new({ Name = "test-command" })
             expect(cmd.Name).to.equal("test-command")
 
-            local cmd2 = Command.new({ Name = "my-long-command-name" })
+            const cmd2 = Command.new({ Name = "my-long-command-name" })
             expect(cmd2.Name).to.equal("my-long-command-name")
         end)
 
@@ -158,7 +158,7 @@ return function()
         end)
 
         it("should create Command with Args", function()
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "copy",
                 Args = {
                     Arg.new({ Name = "source" }),
@@ -171,7 +171,7 @@ return function()
         end)
 
         it("should create Command with Flags", function()
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "build",
                 Flags = {
                     Flag.new({ Name = "verbose", Shorthand = "v" }),
@@ -230,7 +230,7 @@ return function()
         end)
 
         it("should allow optional Args after required Args", function()
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "test",
                 Args = {
                     Arg.new({ Name = "required", Required = true }),
@@ -242,7 +242,7 @@ return function()
 
         it("should create Command with Impl function", function()
             local _executed = false
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "test",
                 Impl = function()
                     _executed = true
@@ -252,7 +252,7 @@ return function()
         end)
 
         it("should create Command with Subcommands", function()
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "git",
                 Subcommands = {
                     Command.new({ Name = "add" }),
@@ -347,7 +347,7 @@ return function()
     describe("Command.Execute", function()
         it("should execute command with no args", function()
             local executed = false
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "test",
                 Impl = function()
                     executed = true
@@ -359,7 +359,7 @@ return function()
 
         it("should pass parsed args to implementation", function()
             local receivedArgs
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "greet",
                 Args = {
                     Arg.new({ Name = "name", Type = "string" }),
@@ -375,7 +375,7 @@ return function()
 
         it("should parse multiple args correctly", function()
             local receivedArgs
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "add",
                 Args = {
                     Arg.new({ Name = "a", Type = "int" }),
@@ -392,7 +392,7 @@ return function()
 
         it("should parse flags correctly", function()
             local receivedFlags
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "test",
                 Flags = {
                     Flag.new({ Name = "verbose", Shorthand = "v" }),
@@ -407,7 +407,7 @@ return function()
 
         it("should parse shorthand flags correctly", function()
             local receivedFlags
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "test",
                 Flags = {
                     Flag.new({ Name = "verbose", Shorthand = "v" }),
@@ -422,7 +422,7 @@ return function()
 
         it("should parse typed flags with values", function()
             local receivedFlags
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "test",
                 Flags = {
                     Flag.new({ Name = "port", Type = "int" }),
@@ -437,7 +437,7 @@ return function()
 
         it("should use default flag values when not provided", function()
             local receivedFlags
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "test",
                 Flags = {
                     Flag.new({ Name = "port", Type = "int", Default = 3000 }),
@@ -452,7 +452,7 @@ return function()
 
         it("should use default arg values when not provided", function()
             local receivedArgs
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "test",
                 Args = {
                     Arg.new({ Name = "count", Type = "int", Required = false, Default = 5 }),
@@ -467,7 +467,7 @@ return function()
 
         it("should handle mixed args and flags", function()
             local receivedArgs, receivedFlags
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "build",
                 Args = {
                     Arg.new({ Name = "target", Type = "string" }),
@@ -489,7 +489,7 @@ return function()
 
         it("should execute matching subcommand", function()
             local subExecuted = false
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "git",
                 Subcommands = {
                     Command.new({
@@ -506,7 +506,7 @@ return function()
 
         it("should pass remaining tokens to subcommand", function()
             local receivedArgs
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "git",
                 Subcommands = {
                     Command.new({
@@ -526,7 +526,7 @@ return function()
 
         it("should print version when --version flag is used", function()
             local executed = false
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "test",
                 Version = "1.2.3",
                 Impl = function()
@@ -539,7 +539,7 @@ return function()
 
         it("should print version when -v shorthand is used", function()
             local executed = false
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "test",
                 Version = "1.2.3",
                 Impl = function()
@@ -561,7 +561,7 @@ return function()
 
     describe("Command.ShowHelp", function()
         it("should generate help message", function()
-            local cmd = Command.new({
+            const cmd = Command.new({
                 Name = "test",
                 Description = "A test command",
             })
@@ -569,7 +569,7 @@ return function()
         end)
 
         it("should show full command path for subcommands", function()
-            local sub = Command.new({
+            const sub = Command.new({
                 Name = "status",
                 Description = "Show status.",
                 Impl = function() end,
@@ -582,12 +582,12 @@ return function()
         end)
 
         it("should show full command path for deeply nested subcommands", function()
-            local leaf = Command.new({
+            const leaf = Command.new({
                 Name = "list",
                 Description = "List items.",
                 Impl = function() end,
             })
-            local middle = Command.new({
+            const middle = Command.new({
                 Name = "api-key",
                 Description = "Manage API keys.",
                 Subcommands = { leaf },
@@ -601,7 +601,7 @@ return function()
         end)
 
         it("should include command path in help message", function()
-            local sub = Command.new({
+            const sub = Command.new({
                 Name = "deploy",
                 Description = "Deploy the app.",
                 Impl = function() end,

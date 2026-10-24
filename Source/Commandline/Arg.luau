@@ -8,8 +8,8 @@ have optional default values, which makes them non-required.
 
 --]]
 
-local TypeUtils = require("./Helpers/TypeUtils")
-local t = require("@packages/t")
+const TypeUtils = require("./Helpers/TypeUtils")
+const t = require("@packages/t")
 
 export type Arg = {
     Name: string,
@@ -26,7 +26,7 @@ export type ArgOptions = {
     Default: any?,
 }
 
-local IArgOptions = t.strictInterface({
+const IArgOptions = t.strictInterface({
     Name = t.string,
     Description = t.optional(t.string),
     Type = t.optional(t.string),
@@ -34,13 +34,13 @@ local IArgOptions = t.strictInterface({
     Default = t.optional(t.any),
 })
 
-local Arg = {}
+const Arg = {}
 Arg.__index = Arg
 
 function Arg.new(argOptions: ArgOptions)
     assert(IArgOptions(argOptions), "Invalid Arg options provided.")
 
-    local self = setmetatable({}, Arg)
+    const self = setmetatable({}, Arg)
 
     self.Name = argOptions.Name
     self.Description = argOptions.Description or "No description."

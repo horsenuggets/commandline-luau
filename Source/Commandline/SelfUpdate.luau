@@ -15,13 +15,13 @@ platform-specific details of replacing a running executable:
 
 --]]
 
-local fs = require("@lune/fs")
-local process = require("@lune/process")
-local t = require("@packages/t")
+const fs = require("@lune/fs")
+const process = require("@lune/process")
+const t = require("@packages/t")
 
-local IS_WINDOWS = process.os == "windows"
+const IS_WINDOWS = process.os == "windows"
 
-local SelfUpdate = {}
+const SelfUpdate = {}
 
 --[[
     Replaces a binary file at the given path with new contents.
@@ -44,14 +44,14 @@ function SelfUpdate.replaceBinary(options: {
         newContents = t.string,
     })(options))
 
-    local targetPath = options.targetPath
-    local newContents = options.newContents
+    const targetPath = options.targetPath
+    const newContents = options.newContents
 
     if IS_WINDOWS then
         -- Windows locks running executables. Rename the old binary
         -- first (rename works even on locked files), then write the
         -- new one to the original path.
-        local oldPath = targetPath .. ".old"
+        const oldPath = targetPath .. ".old"
         if fs.isFile(oldPath) then
             fs.removeFile(oldPath)
         end
@@ -79,7 +79,7 @@ end
 function SelfUpdate.cleanupOldBinary(binaryPath: string)
     assert(t.string(binaryPath))
 
-    local oldPath = binaryPath .. ".old"
+    const oldPath = binaryPath .. ".old"
     if fs.isFile(oldPath) then
         pcall(function()
             fs.removeFile(oldPath)
@@ -95,11 +95,11 @@ end
 function SelfUpdate.findExecutable(name: string): string?
     assert(t.string(name))
 
-    local command = if IS_WINDOWS then "where" else "which"
-    local result = process.exec(command, { name })
+    const command = if IS_WINDOWS then "where" else "which"
+    const result = process.exec(command, { name })
 
     if result.ok then
-        local path = result.stdout:match("^%s*(.-)%s*$")
+        const path = result.stdout:match("^%s*(.-)%s*$")
         if path and fs.isFile(path) then
             return path
         end

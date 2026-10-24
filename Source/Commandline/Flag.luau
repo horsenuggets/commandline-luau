@@ -8,8 +8,8 @@ and optional single-character shorthand (-n).
 
 --]]
 
-local TypeUtils = require("./Helpers/TypeUtils")
-local t = require("@packages/t")
+const TypeUtils = require("./Helpers/TypeUtils")
+const t = require("@packages/t")
 
 export type Flag = {
     Name: string,
@@ -26,7 +26,7 @@ export type FlagOptions = {
     Default: any?,
 }
 
-local IFlagOptions = t.strictInterface({
+const IFlagOptions = t.strictInterface({
     Name = t.string,
     Description = t.optional(t.string),
     Type = t.optional(t.string),
@@ -34,13 +34,13 @@ local IFlagOptions = t.strictInterface({
     Default = t.optional(t.any),
 })
 
-local Flag = {}
+const Flag = {}
 Flag.__index = Flag
 
 function Flag.new(flagOptions: FlagOptions)
     assert(IFlagOptions(flagOptions), "Invalid Flag options provided.")
 
-    local self = setmetatable({}, Flag)
+    const self = setmetatable({}, Flag)
 
     self.Name = flagOptions.Name
     self.Description = flagOptions.Description or "No description."

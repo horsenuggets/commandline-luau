@@ -8,11 +8,11 @@ metadata.
 
 --]]
 
-local Commandline = require("@commandline")
+const Commandline = require("@commandline")
 
-local Toolkit = Commandline.Toolkit
+const Toolkit = Commandline.Toolkit
 
-local TEST_OPTIONS = {
+const TEST_OPTIONS = {
     Name = "mytool",
     InstallDir = ".mytool-cli",
     Version = "1.0.0",
@@ -22,12 +22,12 @@ local TEST_OPTIONS = {
 return function()
     describe("installCommand", function()
         it("should return a Command with name 'install'", function()
-            local cmd = Toolkit.installCommand(TEST_OPTIONS)
+            const cmd = Toolkit.installCommand(TEST_OPTIONS)
             expect(cmd.Name).to.equal("install")
         end)
 
         it("should include the CLI name in the description", function()
-            local cmd = Toolkit.installCommand({
+            const cmd = Toolkit.installCommand({
                 Name = "rbxstudio",
                 InstallDir = ".rbxstudio-cli",
                 Version = "1.0.0",
@@ -37,7 +37,7 @@ return function()
         end)
 
         it("should include the install directory in the description", function()
-            local cmd = Toolkit.installCommand(TEST_OPTIONS)
+            const cmd = Toolkit.installCommand(TEST_OPTIONS)
             expect(string.find(cmd.Description, ".mytool%-cli")).to.be.ok()
         end)
 
@@ -57,12 +57,12 @@ return function()
 
     describe("updateCommand", function()
         it("should return a Command with name 'update'", function()
-            local cmd = Toolkit.updateCommand(TEST_OPTIONS)
+            const cmd = Toolkit.updateCommand(TEST_OPTIONS)
             expect(cmd.Name).to.equal("update")
         end)
 
         it("should include the CLI name in the description", function()
-            local cmd = Toolkit.updateCommand({
+            const cmd = Toolkit.updateCommand({
                 Name = "rbxstudio",
                 InstallDir = ".rbxstudio-cli",
                 Version = "1.0.0",
@@ -72,7 +72,7 @@ return function()
         end)
 
         it("should include a --version flag", function()
-            local cmd = Toolkit.updateCommand(TEST_OPTIONS)
+            const cmd = Toolkit.updateCommand(TEST_OPTIONS)
             local hasVersionFlag = false
             for _, flag in cmd._flags do
                 if flag.Name == "version" then
@@ -84,7 +84,7 @@ return function()
         end)
 
         it("should have a shorthand -v for the version flag", function()
-            local cmd = Toolkit.updateCommand(TEST_OPTIONS)
+            const cmd = Toolkit.updateCommand(TEST_OPTIONS)
             for _, flag in cmd._flags do
                 if flag.Name == "version" then
                     expect(flag.Shorthand).to.equal("v")

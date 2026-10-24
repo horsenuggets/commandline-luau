@@ -8,19 +8,19 @@ for parallelism.
 
 --]]
 
-local fs = require("@lune/fs")
-local process = require("@lune/process")
+const fs = require("@lune/fs")
+const process = require("@lune/process")
 
-local Commandline = require("@commandline")
+const Commandline = require("@commandline")
 
-local Command = Commandline.Command
-local Flag = Commandline.Flag
-local Toolkit = Commandline.Toolkit
+const Command = Commandline.Command
+const Flag = Commandline.Flag
+const Toolkit = Commandline.Toolkit
 
 local _counter = 0
-local function createTempDir(): string
+const function createTempDir(): string
     _counter += 1
-    local path = "/tmp/commandline-toolkit-test-"
+    const path = "/tmp/commandline-toolkit-test-"
         .. tostring(os.time())
         .. "-"
         .. tostring(math.random(100000, 999999))
@@ -30,29 +30,29 @@ local function createTempDir(): string
     return path
 end
 
-local function cleanup(path: string)
+const function cleanup(path: string)
     if fs.isDir(path) then
         process.exec("rm", { "-rf", path })
     end
 end
 
-local function writeFile(dir: string, relativePath: string, content: string)
-    local fullPath = dir .. "/" .. relativePath
-    local parentDir = string.match(fullPath, "(.+)/[^/]+$")
+const function writeFile(dir: string, relativePath: string, content: string)
+    const fullPath = dir .. "/" .. relativePath
+    const parentDir = string.match(fullPath, "(.+)/[^/]+$")
     if parentDir and not fs.isDir(parentDir) then
         fs.writeDir(parentDir)
     end
     fs.writeFile(fullPath, content)
 end
 
-local function readFile(dir: string, relativePath: string): string
+const function readFile(dir: string, relativePath: string): string
     return fs.readFile(dir .. "/" .. relativePath)
 end
 
 return function()
     describe("generateVersion", function()
         it("should generate a version module from a VERSION file", function()
-            local tempDir = createTempDir()
+            const tempDir = createTempDir()
             writeFile(tempDir, "VERSION", "1.2.3\n")
             Toolkit.generateVersion({
                 VersionFile = tempDir .. "/VERSION",
@@ -66,7 +66,7 @@ return function()
         end)
 
         it("should strip whitespace from version string", function()
-            local tempDir = createTempDir()
+            const tempDir = createTempDir()
             writeFile(tempDir, "VERSION", "  0.5.10  \n")
             Toolkit.generateVersion({
                 VersionFile = tempDir .. "/VERSION",
@@ -79,7 +79,7 @@ return function()
         end)
 
         it("should handle version with no trailing newline", function()
-            local tempDir = createTempDir()
+            const tempDir = createTempDir()
             writeFile(tempDir, "VERSION", "2.0.0")
             Toolkit.generateVersion({
                 VersionFile = tempDir .. "/VERSION",
@@ -92,7 +92,7 @@ return function()
         end)
 
         it("should handle pre-release version strings", function()
-            local tempDir = createTempDir()
+            const tempDir = createTempDir()
             writeFile(tempDir, "VERSION", "0.10.4-horse.10.0\n")
             Toolkit.generateVersion({
                 VersionFile = tempDir .. "/VERSION",
@@ -105,7 +105,7 @@ return function()
         end)
 
         it("should create parent directories for output path", function()
-            local tempDir = createTempDir()
+            const tempDir = createTempDir()
             writeFile(tempDir, "VERSION", "1.0.0\n")
             Toolkit.generateVersion({
                 VersionFile = tempDir .. "/VERSION",
@@ -116,8 +116,8 @@ return function()
         end)
 
         it("should default to VERSION in current directory", function()
-            local tempDir = createTempDir()
-            local _originalCwd = process.cwd
+            const tempDir = createTempDir()
+            const _originalCwd = process.cwd
             writeFile(tempDir, "VERSION", "3.0.0\n")
 
             -- generateVersion with no VersionFile should look for "VERSION"
@@ -147,7 +147,7 @@ return function()
         end)
 
         it("should build a minimal executable from a directory entry point", function()
-            local tempDir = createTempDir()
+            const tempDir = createTempDir()
             writeFile(tempDir, "src/init.luau", 'print("hello")\n')
 
             Toolkit.build({
@@ -156,18 +156,18 @@ return function()
                 OutputDir = tempDir .. "/out",
             })
 
-            local binaryPath = tempDir .. "/out/test-binary"
+            const binaryPath = tempDir .. "/out/test-binary"
             expect(fs.isFile(binaryPath)).to.equal(true)
 
             -- Run the binary and verify output
-            local result = process.exec(binaryPath, {})
+            const result = process.exec(binaryPath, {})
             expect(result.ok).to.equal(true)
             expect(string.find(result.stdout, "hello")).to.be.ok()
             cleanup(tempDir)
         end)
 
         it("should build a minimal executable from a file entry point", function()
-            local tempDir = createTempDir()
+            const tempDir = createTempDir()
             writeFile(tempDir, "main.luau", 'print("from-file")\n')
 
             Toolkit.build({
@@ -176,17 +176,17 @@ return function()
                 OutputDir = tempDir .. "/out",
             })
 
-            local binaryPath = tempDir .. "/out/file-binary"
+            const binaryPath = tempDir .. "/out/file-binary"
             expect(fs.isFile(binaryPath)).to.equal(true)
 
-            local result = process.exec(binaryPath, {})
+            const result = process.exec(binaryPath, {})
             expect(result.ok).to.equal(true)
             expect(string.find(result.stdout, "from%-file")).to.be.ok()
             cleanup(tempDir)
         end)
 
         it("should strip shebangs from file entry points", function()
-            local tempDir = createTempDir()
+            const tempDir = createTempDir()
             writeFile(tempDir, "main.luau", '#!/usr/bin/env -S lune run\nprint("shebang-stripped")\n')
 
             Toolkit.build({
@@ -195,17 +195,17 @@ return function()
                 OutputDir = tempDir .. "/out",
             })
 
-            local binaryPath = tempDir .. "/out/shebang-binary"
+            const binaryPath = tempDir .. "/out/shebang-binary"
             expect(fs.isFile(binaryPath)).to.equal(true)
 
-            local result = process.exec(binaryPath, {})
+            const result = process.exec(binaryPath, {})
             expect(result.ok).to.equal(true)
             expect(string.find(result.stdout, "shebang%-stripped")).to.be.ok()
             cleanup(tempDir)
         end)
 
         it("should create the output directory if it does not exist", function()
-            local tempDir = createTempDir()
+            const tempDir = createTempDir()
             writeFile(tempDir, "src/init.luau", 'print("mkdir")\n')
 
             Toolkit.build({
@@ -220,7 +220,7 @@ return function()
         end)
 
         it("should remove existing binary before building", function()
-            local tempDir = createTempDir()
+            const tempDir = createTempDir()
             writeFile(tempDir, "src/init.luau", 'print("v2")\n')
             writeFile(tempDir, "out/old-binary", "old content")
 
@@ -230,14 +230,14 @@ return function()
                 OutputDir = tempDir .. "/out",
             })
 
-            local result = process.exec(tempDir .. "/out/old-binary", {})
+            const result = process.exec(tempDir .. "/out/old-binary", {})
             expect(result.ok).to.equal(true)
             expect(string.find(result.stdout, "v2")).to.be.ok()
             cleanup(tempDir)
         end)
 
         it("should clean up temp files even if build fails", function()
-            local tempDir = createTempDir()
+            const tempDir = createTempDir()
             writeFile(tempDir, "bad.luau", "#!/usr/bin/env lune\nthis is not valid luau\n")
 
             pcall(function()
@@ -249,7 +249,7 @@ return function()
             end)
 
             -- The temp _build_entry.luau should be cleaned up
-            local files = fs.readDir(tempDir)
+            const files = fs.readDir(tempDir)
             for _, file in files do
                 expect(file).never.to.equal("_build_entry.luau")
             end
@@ -276,7 +276,7 @@ return function()
             })
 
             expect(#root._subcommands).to.equal(2)
-            local completionsCmd = root._subcommands[2]
+            const completionsCmd = root._subcommands[2]
             expect(completionsCmd.Name).to.equal("completions")
             expect(completionsCmd.Description).to.equal("Generate shell completion script.")
         end)
@@ -301,7 +301,7 @@ return function()
                 },
             })
 
-            local names = {}
+            const names = {}
             for _, sub in root._subcommands do
                 table.insert(names, sub.Name)
             end

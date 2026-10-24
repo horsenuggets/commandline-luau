@@ -8,25 +8,25 @@ enabling shell completions.
 
 --]]
 
-local Chalk = require("@packages/Chalk")
-local fs = require("@lune/fs")
-local process = require("@lune/process")
-local t = require("@packages/t")
+const Chalk = require("@packages/Chalk")
+const fs = require("@lune/fs")
+const process = require("@lune/process")
+const t = require("@packages/t")
 
-local Completions = require("@self/Completions")
+const Completions = require("@self/Completions")
 
-local Toolkit = {}
+const Toolkit = {}
 
 -- Validation types
 
-local buildOptionsCheck = t.interface({
+const buildOptionsCheck = t.interface({
     Name = t.string,
     EntryPoint = t.string,
     OutputDir = t.optional(t.string),
     Target = t.optional(t.string),
 })
 
-local generateVersionCheck = t.interface({
+const generateVersionCheck = t.interface({
     VersionFile = t.optional(t.string),
     OutputPath = t.string,
 })
@@ -48,20 +48,20 @@ function Toolkit.generateVersion(options: {
 })
     assert(generateVersionCheck(options))
 
-    local versionFile = options.VersionFile or "VERSION"
+    const versionFile = options.VersionFile or "VERSION"
 
     if not fs.isFile(versionFile) then
         print(Chalk.red('VERSION file not found at "' .. versionFile .. '".'))
         process.exit(1)
     end
 
-    local version = string.gsub(fs.readFile(versionFile), "%s+", "")
-    local versionModule = '--[[\n\n__VERSION__\n\nAuto-generated version module.\n\n--]]\n\nreturn "'
+    const version = string.gsub(fs.readFile(versionFile), "%s+", "")
+    const versionModule = '--[[\n\n__VERSION__\n\nAuto-generated version module.\n\n--]]\n\nreturn "'
         .. version
         .. '"\n'
 
     -- Create parent directories if needed
-    local parentDir = string.match(options.OutputPath, "(.+)/[^/]+$")
+    const parentDir = string.match(options.OutputPath, "(.+)/[^/]+$")
     if parentDir and not fs.isDir(parentDir) then
         fs.writeDir(parentDir)
     end
@@ -89,14 +89,14 @@ function Toolkit.build(options: {
 })
     assert(buildOptionsCheck(options))
 
-    local outputDir = options.OutputDir or "Build"
-    local target = options.Target
+    const outputDir = options.OutputDir or "Build"
+    const target = options.Target
 
     print()
     print("Building " .. Chalk.bold(Chalk.blueBright(options.Name)) .. " executable...")
 
     -- Resolve entry point
-    local entryPoint = options.EntryPoint
+    const entryPoint = options.EntryPoint
     if not fs.isDir(entryPoint) and not fs.isFile(entryPoint) then
         print(Chalk.red('Entry point "' .. entryPoint .. '" not found.'))
         process.exit(1)
@@ -108,7 +108,7 @@ function Toolkit.build(options: {
     end
 
     -- Remove existing binary to avoid corruption issues
-    local outputPath = outputDir .. "/" .. options.Name
+    const outputPath = outputDir .. "/" .. options.Name
     if fs.isFile(outputPath) then
         fs.removeFile(outputPath)
     end
@@ -122,18 +122,18 @@ function Toolkit.build(options: {
     local tempFile: string? = nil
 
     if fs.isFile(entryPoint) then
-        local entryContent = fs.readFile(entryPoint)
+        const entryContent = fs.readFile(entryPoint)
         if string.sub(entryContent, 1, 2) == "#!" then
-            local entryDir = string.match(entryPoint, "(.*/)") or ""
-            local tempPath = entryDir .. "_build_entry.luau"
+            const entryDir = string.match(entryPoint, "(.*/)") or ""
+            const tempPath = entryDir .. "_build_entry.luau"
             tempFile = tempPath
-            local stripped = string.gsub(entryContent, "^#![^\n]*\n", "")
+            const stripped = string.gsub(entryContent, "^#![^\n]*\n", "")
             fs.writeFile(tempPath, stripped)
             buildTarget = tempFile
         end
     end
 
-    local args = { "build", buildTarget, "--output", outputPath }
+    const args = { "build", buildTarget, "--output", outputPath }
     if target then
         table.insert(args, "--target")
         table.insert(args, target)
@@ -143,7 +143,7 @@ function Toolkit.build(options: {
     end
     print("Entry point is " .. Chalk.dim(entryPoint) .. ".")
 
-    local result = process.exec("lune", args)
+    const result = process.exec("lune", args)
 
     -- Clean up temp file
     if tempFile and fs.isFile(tempFile) then
@@ -193,8 +193,8 @@ end
 function Toolkit.completionsCommand(getRootCommand: () -> any): any
     assert(t.callback(getRootCommand))
 
-    local Command = require("@self/Command")
-    local Arg = require("@self/Arg")
+    const Command = require("@self/Command")
+    const Arg = require("@self/Arg")
 
     return Command.new({
         Name = "completions",
@@ -229,13 +229,13 @@ function Toolkit.installCompletions(options: {
     assert(t.table(options))
     assert(t.table(options.Command))
 
-    local shell = options.Shell or "zsh"
-    local homeDir = process.env.HOME or process.env.USERPROFILE or ""
-    local completionsDir = homeDir .. "/.commandline-luau/completions"
-    local commandName = options.Command.Name
+    const shell = options.Shell or "zsh"
+    const homeDir = process.env.HOME or process.env.USERPROFILE or ""
+    const completionsDir = homeDir .. "/.commandline-luau/completions"
+    const commandName = options.Command.Name
 
     -- Generate the completion script
-    local script = Completions.generate(options.Command, shell)
+    const script = Completions.generate(options.Command, shell)
 
     -- Write the completion file
     if not fs.isDir(completionsDir) then
@@ -254,12 +254,12 @@ function Toolkit.installCompletions(options: {
     print("Installed " .. shell .. " completions to " .. Chalk.dim(completionFile) .. ".")
 
     -- Configure the shell to load completions
-    local marker = "# Added by commandline-luau"
+    const marker = "# Added by commandline-luau"
 
     if shell == "zsh" then
-        local configPath = homeDir .. "/.zshrc"
-        local fPathLine = "fpath=(~/.commandline-luau/completions $fpath)"
-        local compInitLine = "autoload -Uz compinit && compinit"
+        const configPath = homeDir .. "/.zshrc"
+        const fPathLine = "fpath=(~/.commandline-luau/completions $fpath)"
+        const compInitLine = "autoload -Uz compinit && compinit"
 
         local content = ""
         if fs.isFile(configPath) then
@@ -285,8 +285,8 @@ function Toolkit.installCompletions(options: {
         print(Chalk.yellow("Restart your terminal to enable completions."))
     elseif shell == "powershell" or shell == "pwsh" then
         -- Find or create the PowerShell profile
-        local profileDir = homeDir .. "/.config/powershell"
-        local profilePath = profileDir .. "/Microsoft.PowerShell_profile.ps1"
+        const profileDir = homeDir .. "/.config/powershell"
+        const profilePath = profileDir .. "/Microsoft.PowerShell_profile.ps1"
 
         if not fs.isDir(profileDir) then
             fs.writeDir(profileDir)
@@ -309,7 +309,7 @@ function Toolkit.installCompletions(options: {
             content = content .. "\n"
         end
 
-        local sourceLine = ". " .. completionFile
+        const sourceLine = ". " .. completionFile
 
         content = content .. marker .. "\n" .. sourceLine .. "\n"
 
@@ -323,9 +323,9 @@ end
 -- Install and Update (Direct Binary Replacement)
 ------------------------------------------------------------------------------------------
 
-local SelfUpdate = require("@self/SelfUpdate")
+const SelfUpdate = require("@self/SelfUpdate")
 
-local installOptionsCheck = t.interface({
+const installOptionsCheck = t.interface({
     Name = t.string,
     InstallDir = t.string,
     Version = t.string,
@@ -357,32 +357,32 @@ function Toolkit.installCommand(options: {
 }): any
     assert(installOptionsCheck(options))
 
-    local Command = require("@self/Command")
-    local net = require("@lune/net")
-    local serde = require("@lune/serde")
+    const Command = require("@self/Command")
+    const net = require("@lune/net")
+    const serde = require("@lune/serde")
 
-    local name = options.Name
-    local installDir = options.InstallDir
-    local version = options.Version
-    local repository = options.Repository
+    const name = options.Name
+    const installDir = options.InstallDir
+    const version = options.Version
+    const repository = options.Repository
 
-    local IS_WINDOWS = process.os == "windows"
-    local HOME_DIR = if IS_WINDOWS then process.env.USERPROFILE or "" else process.env.HOME or ""
-    local INSTALL_PATH = HOME_DIR .. "/" .. installDir
-    local BIN_DIR = INSTALL_PATH .. "/bin"
-    local EXECUTABLE_SUFFIX = if IS_WINDOWS then ".exe" else ""
-    local PATH_EXPORT_COMMENT = "# Added by " .. name
-    local PATH_EXPORT_LINE = `export PATH="{BIN_DIR}:$PATH"`
-    local SHELL_CONFIGS = {
+    const IS_WINDOWS = process.os == "windows"
+    const HOME_DIR = if IS_WINDOWS then process.env.USERPROFILE or "" else process.env.HOME or ""
+    const INSTALL_PATH = HOME_DIR .. "/" .. installDir
+    const BIN_DIR = INSTALL_PATH .. "/bin"
+    const EXECUTABLE_SUFFIX = if IS_WINDOWS then ".exe" else ""
+    const PATH_EXPORT_COMMENT = "# Added by " .. name
+    const PATH_EXPORT_LINE = `export PATH="{BIN_DIR}:$PATH"`
+    const SHELL_CONFIGS = {
         { file = ".bash_profile", shell = "bash" },
         { file = ".bashrc", shell = "bash" },
         { file = ".zshrc", shell = "zsh" },
     }
-    local XSH_PATH_FILE = HOME_DIR .. "/.path"
+    const XSH_PATH_FILE = HOME_DIR .. "/.path"
 
-    local function downloadLatestBinary(destPath: string): boolean
-        local url = `https://api.github.com/repos/{repository}/releases/latest`
-        local ok, response = pcall(net.request, {
+    const function downloadLatestBinary(destPath: string): boolean
+        const url = `https://api.github.com/repos/{repository}/releases/latest`
+        const ok, response = pcall(net.request, {
             url = url,
             method = "GET",
             headers = { ["User-Agent"] = name },
@@ -393,14 +393,14 @@ function Toolkit.installCommand(options: {
             return false
         end
 
-        local success, release = pcall(serde.decode, "json" :: "json", response.body)
+        const success, release = pcall(serde.decode, "json" :: "json", response.body)
         if not success then
             print(Chalk.red("Failed to parse release data."))
             return false
         end
 
-        local platformSuffix = SelfUpdate.getPlatformSuffix()
-        local assetName = `{name}-{platformSuffix}{EXECUTABLE_SUFFIX}`
+        const platformSuffix = SelfUpdate.getPlatformSuffix()
+        const assetName = `{name}-{platformSuffix}{EXECUTABLE_SUFFIX}`
         local downloadUrl: string? = nil
 
         for _, asset in release.assets or {} do
@@ -415,7 +415,7 @@ function Toolkit.installCommand(options: {
             return false
         end
 
-        local dlOk, dlResponse = pcall(net.request, {
+        const dlOk, dlResponse = pcall(net.request, {
             url = downloadUrl,
             method = "GET",
             headers = { ["User-Agent"] = name },
@@ -434,15 +434,15 @@ function Toolkit.installCommand(options: {
         return true
     end
 
-    local function addToPath()
+    const function addToPath()
         if IS_WINDOWS then
-            local psCmd = "$p = [Environment]::GetEnvironmentVariable('PATH','User');"
+            const psCmd = "$p = [Environment]::GetEnvironmentVariable('PATH','User');"
                 .. " if ($p -notlike '*"
                 .. BIN_DIR
                 .. "*') { [Environment]::SetEnvironmentVariable('PATH', '"
                 .. BIN_DIR
                 .. ";' + $p, 'User') }"
-            local result = process.exec("powershell", { "-Command", psCmd })
+            const result = process.exec("powershell", { "-Command", psCmd })
             if result.ok then
                 print(`Added {Chalk.dim(BIN_DIR)} to user PATH.`)
             end
@@ -465,7 +465,7 @@ function Toolkit.installCommand(options: {
 
         -- Fall back to shell config files
         for _, config in SHELL_CONFIGS do
-            local configPath = `{HOME_DIR}/{config.file}`
+            const configPath = `{HOME_DIR}/{config.file}`
             if fs.isFile(configPath) then
                 local content = fs.readFile(configPath)
                 if not string.find(content, PATH_EXPORT_COMMENT, 1, true) then
@@ -495,12 +495,12 @@ function Toolkit.installCommand(options: {
                 fs.writeDir(BIN_DIR)
             end
 
-            local binaryPath = `{BIN_DIR}/{name}{EXECUTABLE_SUFFIX}`
+            const binaryPath = `{BIN_DIR}/{name}{EXECUTABLE_SUFFIX}`
 
             -- Try to copy current running binary first
-            local currentExe = SelfUpdate.findExecutable(name)
+            const currentExe = SelfUpdate.findExecutable(name)
             if currentExe then
-                local contents = fs.readFile(currentExe)
+                const contents = fs.readFile(currentExe)
                 fs.writeFile(binaryPath, contents)
                 if not IS_WINDOWS then
                     process.exec("chmod", { "+x", binaryPath })
@@ -550,19 +550,19 @@ function Toolkit.updateCommand(options: {
 }): any
     assert(installOptionsCheck(options))
 
-    local Command = require("@self/Command")
-    local Flag = require("@self/Flag")
-    local net = require("@lune/net")
-    local serde = require("@lune/serde")
+    const Command = require("@self/Command")
+    const Flag = require("@self/Flag")
+    const net = require("@lune/net")
+    const serde = require("@lune/serde")
 
-    local name = options.Name
-    local currentVersion = options.Version
-    local repository = options.Repository
+    const name = options.Name
+    const currentVersion = options.Version
+    const repository = options.Repository
 
-    local IS_WINDOWS = process.os == "windows"
-    local EXECUTABLE_SUFFIX = if IS_WINDOWS then ".exe" else ""
+    const IS_WINDOWS = process.os == "windows"
+    const EXECUTABLE_SUFFIX = if IS_WINDOWS then ".exe" else ""
 
-    local function getRelease(targetVersion: string?): { version: string, assets: { any } }?
+    const function getRelease(targetVersion: string?): { version: string, assets: { any } }?
         local url: string
         if targetVersion then
             url = `https://api.github.com/repos/{repository}/releases/tags/{targetVersion}`
@@ -570,7 +570,7 @@ function Toolkit.updateCommand(options: {
             url = `https://api.github.com/repos/{repository}/releases/latest`
         end
 
-        local ok, response = pcall(net.request, {
+        const ok, response = pcall(net.request, {
             url = url,
             method = "GET",
             headers = { ["User-Agent"] = name },
@@ -579,7 +579,7 @@ function Toolkit.updateCommand(options: {
             return nil
         end
 
-        local success, data = pcall(serde.decode, "json" :: "json", response.body)
+        const success, data = pcall(serde.decode, "json" :: "json", response.body)
         if not success then
             return nil
         end
@@ -602,17 +602,17 @@ function Toolkit.updateCommand(options: {
             }),
         },
         Impl = function(args)
-            local targetVersion = args.version
+            const targetVersion = args.version
 
             -- Clean up leftover .old file from previous Windows update
-            local currentExe = SelfUpdate.findExecutable(name)
+            const currentExe = SelfUpdate.findExecutable(name)
             if currentExe then
                 SelfUpdate.cleanupOldBinary(currentExe)
             end
 
             print(`Checking for updates to {Chalk.bold(Chalk.blueBright(name))}...`)
 
-            local release = getRelease(targetVersion)
+            const release = getRelease(targetVersion)
             if not release then
                 print(
                     Chalk.red(
@@ -624,7 +624,7 @@ function Toolkit.updateCommand(options: {
                 process.exit(1)
             end
 
-            local newVersion = release.version
+            const newVersion = release.version
             if newVersion == currentVersion and not targetVersion then
                 print(`Already on the latest version ({Chalk.bold(Chalk.blueBright(currentVersion))}).`)
                 return
@@ -633,8 +633,8 @@ function Toolkit.updateCommand(options: {
             print(`Updating from {Chalk.dim(currentVersion)} to {Chalk.bold(Chalk.blueBright(newVersion))}...`)
 
             -- Find download URL for current platform
-            local platformSuffix = SelfUpdate.getPlatformSuffix()
-            local assetName = `{name}-{platformSuffix}{EXECUTABLE_SUFFIX}`
+            const platformSuffix = SelfUpdate.getPlatformSuffix()
+            const assetName = `{name}-{platformSuffix}{EXECUTABLE_SUFFIX}`
             local downloadUrl: string? = nil
 
             for _, asset in release.assets do
@@ -650,7 +650,7 @@ function Toolkit.updateCommand(options: {
             end
 
             -- Download new binary
-            local dlOk, dlResponse = pcall(net.request, {
+            const dlOk, dlResponse = pcall(net.request, {
                 url = downloadUrl,
                 method = "GET",
                 headers = { ["User-Agent"] = name },
