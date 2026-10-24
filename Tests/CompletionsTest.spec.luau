@@ -8,13 +8,13 @@ definitions.
 
 --]]
 
-local Commandline = require("@commandline")
+const Commandline = require("@commandline")
 
-local Command = Commandline.Command
-local Completions = Commandline.Completions
-local Flag = Commandline.Flag
+const Command = Commandline.Command
+const Completions = Commandline.Completions
+const Flag = Commandline.Flag
 
-local function makeSimpleCommand(): any
+const function makeSimpleCommand(): any
     return Command.new({
         Name = "mytool",
         Description = "A test tool.",
@@ -27,7 +27,7 @@ local function makeSimpleCommand(): any
     })
 end
 
-local function makeCommandWithSubcommands(): any
+const function makeCommandWithSubcommands(): any
     return Command.new({
         Name = "mytool",
         Description = "A test tool.",
@@ -72,14 +72,14 @@ end
 return function()
     describe("generate", function()
         it("should throw for unsupported shell", function()
-            local cmd = makeSimpleCommand()
+            const cmd = makeSimpleCommand()
             expect(function()
                 Completions.generate(cmd, "nushell")
             end).to.throw()
         end)
 
         it("should accept all supported shells", function()
-            local cmd = makeSimpleCommand()
+            const cmd = makeSimpleCommand()
             expect(Completions.generate(cmd, "bash")).to.be.ok()
             expect(Completions.generate(cmd, "fish")).to.be.ok()
             expect(Completions.generate(cmd, "powershell")).to.be.ok()
@@ -90,15 +90,15 @@ return function()
 
     describe("bash", function()
         it("should generate a valid bash completion function", function()
-            local cmd = makeSimpleCommand()
-            local output = Completions.bash(cmd)
+            const cmd = makeSimpleCommand()
+            const output = Completions.bash(cmd)
             expect(string.find(output, "_mytool()")).to.be.ok()
             expect(string.find(output, "complete %-o default %-F _mytool mytool")).to.be.ok()
         end)
 
         it("should include flag names", function()
-            local cmd = makeSimpleCommand()
-            local output = Completions.bash(cmd)
+            const cmd = makeSimpleCommand()
+            const output = Completions.bash(cmd)
             expect(string.find(output, "%-%-verbose")).to.be.ok()
             expect(string.find(output, "%-%-output")).to.be.ok()
             expect(string.find(output, "%-%-help")).to.be.ok()
@@ -106,16 +106,16 @@ return function()
         end)
 
         it("should include subcommand names", function()
-            local cmd = makeCommandWithSubcommands()
-            local output = Completions.bash(cmd)
+            const cmd = makeCommandWithSubcommands()
+            const output = Completions.bash(cmd)
             expect(string.find(output, "build")).to.be.ok()
             expect(string.find(output, "run")).to.be.ok()
             expect(string.find(output, "init")).to.be.ok()
         end)
 
         it("should include subcommand flags", function()
-            local cmd = makeCommandWithSubcommands()
-            local output = Completions.bash(cmd)
+            const cmd = makeCommandWithSubcommands()
+            const output = Completions.bash(cmd)
             expect(string.find(output, "%-%-release")).to.be.ok()
             expect(string.find(output, "%-%-target")).to.be.ok()
             expect(string.find(output, "%-%-port")).to.be.ok()
@@ -124,16 +124,16 @@ return function()
 
     describe("zsh", function()
         it("should generate a valid zsh completion function", function()
-            local cmd = makeSimpleCommand()
-            local output = Completions.zsh(cmd)
+            const cmd = makeSimpleCommand()
+            const output = Completions.zsh(cmd)
             expect(string.find(output, "#compdef mytool")).to.be.ok()
             expect(string.find(output, "_mytool()")).to.be.ok()
             expect(string.find(output, '_mytool "$@"')).to.be.ok()
         end)
 
         it("should include flag specs with shorthands", function()
-            local cmd = makeSimpleCommand()
-            local output = Completions.zsh(cmd)
+            const cmd = makeSimpleCommand()
+            const output = Completions.zsh(cmd)
             expect(string.find(output, "%-v")).to.be.ok()
             expect(string.find(output, "%-%-verbose")).to.be.ok()
             expect(string.find(output, "%-o")).to.be.ok()
@@ -141,22 +141,22 @@ return function()
         end)
 
         it("should include subcommand descriptions", function()
-            local cmd = makeCommandWithSubcommands()
-            local output = Completions.zsh(cmd)
+            const cmd = makeCommandWithSubcommands()
+            const output = Completions.zsh(cmd)
             expect(string.find(output, "build:Build the project")).to.be.ok()
             expect(string.find(output, "run:Run the project")).to.be.ok()
             expect(string.find(output, "init:Initialize a new project")).to.be.ok()
         end)
 
         it("should use compadd for subcommand completion", function()
-            local cmd = makeCommandWithSubcommands()
-            local output = Completions.zsh(cmd)
+            const cmd = makeCommandWithSubcommands()
+            const output = Completions.zsh(cmd)
             expect(string.find(output, "compadd %-V unsorted %-l %-d display_cmds %-a cmd_names")).to.be.ok()
         end)
 
         it("should include typed flag value placeholder", function()
-            local cmd = makeSimpleCommand()
-            local output = Completions.zsh(cmd)
+            const cmd = makeSimpleCommand()
+            const output = Completions.zsh(cmd)
             -- --output is typed (string), should have :value:
             expect(string.find(output, "%[Output file%.%]:value:")).to.be.ok()
         end)
@@ -164,38 +164,38 @@ return function()
 
     describe("fish", function()
         it("should generate fish completions with disable-default", function()
-            local cmd = makeSimpleCommand()
-            local output = Completions.fish(cmd)
+            const cmd = makeSimpleCommand()
+            const output = Completions.fish(cmd)
             expect(string.find(output, "complete %-c mytool %-f")).to.be.ok()
         end)
 
         it("should include flag long names", function()
-            local cmd = makeSimpleCommand()
-            local output = Completions.fish(cmd)
+            const cmd = makeSimpleCommand()
+            const output = Completions.fish(cmd)
             expect(string.find(output, "%-l verbose")).to.be.ok()
             expect(string.find(output, "%-l output")).to.be.ok()
         end)
 
         it("should include flag shorthands", function()
-            local cmd = makeSimpleCommand()
-            local output = Completions.fish(cmd)
+            const cmd = makeSimpleCommand()
+            const output = Completions.fish(cmd)
             expect(string.find(output, "%-s v")).to.be.ok()
             expect(string.find(output, "%-s o")).to.be.ok()
         end)
 
         it("should include flag descriptions", function()
-            local cmd = makeSimpleCommand()
-            local output = Completions.fish(cmd)
+            const cmd = makeSimpleCommand()
+            const output = Completions.fish(cmd)
             expect(string.find(output, "Enable verbose output")).to.be.ok()
             expect(string.find(output, "Output file")).to.be.ok()
         end)
 
         it("should use -r for typed flags", function()
-            local cmd = makeSimpleCommand()
-            local output = Completions.fish(cmd)
+            const cmd = makeSimpleCommand()
+            const output = Completions.fish(cmd)
             -- --output is typed, should have -r (requires argument)
             -- --verbose is boolean, should not have -r
-            local lines = string.split(output, "\n")
+            const lines = string.split(output, "\n")
             for _, line in lines do
                 if string.find(line, "%-l output") then
                     expect(string.find(line, "%-r")).to.be.ok()
@@ -207,8 +207,8 @@ return function()
         end)
 
         it("should include subcommand completions with conditions", function()
-            local cmd = makeCommandWithSubcommands()
-            local output = Completions.fish(cmd)
+            const cmd = makeCommandWithSubcommands()
+            const output = Completions.fish(cmd)
             expect(string.find(output, "__fish_use_subcommand")).to.be.ok()
             expect(string.find(output, '%-a "build"')).to.be.ok()
             expect(string.find(output, '%-a "run"')).to.be.ok()
@@ -219,43 +219,43 @@ return function()
 
     describe("powershell", function()
         it("should register an argument completer", function()
-            local cmd = makeSimpleCommand()
-            local output = Completions.powershell(cmd)
+            const cmd = makeSimpleCommand()
+            const output = Completions.powershell(cmd)
             expect(string.find(output, "Register%-ArgumentCompleter %-CommandName mytool")).to.be.ok()
         end)
 
         it("should include flag names", function()
-            local cmd = makeSimpleCommand()
-            local output = Completions.powershell(cmd)
+            const cmd = makeSimpleCommand()
+            const output = Completions.powershell(cmd)
             expect(string.find(output, "%-%-verbose")).to.be.ok()
             expect(string.find(output, "%-%-output")).to.be.ok()
         end)
 
         it("should include subcommand names", function()
-            local cmd = makeCommandWithSubcommands()
-            local output = Completions.powershell(cmd)
+            const cmd = makeCommandWithSubcommands()
+            const output = Completions.powershell(cmd)
             expect(string.find(output, "build")).to.be.ok()
             expect(string.find(output, "run")).to.be.ok()
             expect(string.find(output, "init")).to.be.ok()
         end)
 
         it("should include subcommand flags", function()
-            local cmd = makeCommandWithSubcommands()
-            local output = Completions.powershell(cmd)
+            const cmd = makeCommandWithSubcommands()
+            const output = Completions.powershell(cmd)
             expect(string.find(output, "%-%-release")).to.be.ok()
             expect(string.find(output, "%-%-target")).to.be.ok()
             expect(string.find(output, "%-%-port")).to.be.ok()
         end)
 
         it("should separate flags from subcommands by context", function()
-            local cmd = makeCommandWithSubcommands()
-            local output = Completions.powershell(cmd)
+            const cmd = makeCommandWithSubcommands()
+            const output = Completions.powershell(cmd)
             expect(string.find(output, "$wordToComplete %-like '%-%*'")).to.be.ok()
         end)
 
         it("should not include shorthand flags", function()
-            local cmd = makeCommandWithSubcommands()
-            local output = Completions.powershell(cmd)
+            const cmd = makeCommandWithSubcommands()
+            const output = Completions.powershell(cmd)
             expect(string.find(output, "'%-r'")).to.equal(nil)
             expect(string.find(output, "'%-t'")).to.equal(nil)
             expect(string.find(output, "'%-p'")).to.equal(nil)

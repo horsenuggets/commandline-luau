@@ -7,7 +7,7 @@ and string types with conversion from string tokens.
 
 --]]
 
-local TypeUtils = {
+const TypeUtils = {
     None = {},
     ValidTypes = {
         boolean = true,
@@ -53,7 +53,7 @@ end
 -- success or (nil, errorMessage) on failure.
 function TypeUtils.castFromString(token: string, typeName: ArgType): (any?, string?)
     if typeName == "boolean" then
-        local lower = token:lower()
+        const lower = token:lower()
         if lower == "true" then
             return true, nil
         elseif lower == "false" then
@@ -62,7 +62,7 @@ function TypeUtils.castFromString(token: string, typeName: ArgType): (any?, stri
             return nil, `Unable to cast "{token}" to boolean. Expected "true" or "false".`
         end
     elseif typeName == "int" then
-        local num = tonumber(token)
+        const num = tonumber(token)
         if num == nil then
             return nil, `Unable to cast "{token}" to int. Not a valid number.`
         end
@@ -71,7 +71,7 @@ function TypeUtils.castFromString(token: string, typeName: ArgType): (any?, stri
         end
         return num, nil
     elseif typeName == "number" then
-        local num = tonumber(token)
+        const num = tonumber(token)
         if num == nil then
             return nil, `Unable to cast "{token}" to number. Not a valid number.`
         end

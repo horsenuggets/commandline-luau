@@ -6,12 +6,12 @@ Tests for the Flag class, covering creation, type validation, and default value 
 
 --]]
 
-local Flag = require("../Source/Commandline/Flag")
+const Flag = require("../Source/Commandline/Flag")
 
 return function()
     describe("Flag.new", function()
         it("should create a basic Flag with default values", function()
-            local flag = Flag.new({ Name = "testflag" })
+            const flag = Flag.new({ Name = "testflag" })
             expect(flag).to.be.ok()
             expect(flag.Name).to.equal("testflag")
             expect(flag.Description).to.equal("No description.")
@@ -21,7 +21,7 @@ return function()
         end)
 
         it("should create a Flag with custom description", function()
-            local flag = Flag.new({
+            const flag = Flag.new({
                 Name = "verbose",
                 Description = "Enable verbose output",
             })
@@ -29,7 +29,7 @@ return function()
         end)
 
         it("should create a Flag with shorthand", function()
-            local flag = Flag.new({
+            const flag = Flag.new({
                 Name = "verbose",
                 Shorthand = "v",
             })
@@ -53,7 +53,7 @@ return function()
         end)
 
         it("should create a typed Flag with boolean type", function()
-            local flag = Flag.new({
+            const flag = Flag.new({
                 Name = "enabled",
                 Type = "boolean",
             })
@@ -61,7 +61,7 @@ return function()
         end)
 
         it("should create a typed Flag with int type", function()
-            local flag = Flag.new({
+            const flag = Flag.new({
                 Name = "count",
                 Type = "int",
             })
@@ -69,7 +69,7 @@ return function()
         end)
 
         it("should create a typed Flag with number type", function()
-            local flag = Flag.new({
+            const flag = Flag.new({
                 Name = "value",
                 Type = "number",
             })
@@ -77,7 +77,7 @@ return function()
         end)
 
         it("should create a typed Flag with string type", function()
-            local flag = Flag.new({
+            const flag = Flag.new({
                 Name = "name",
                 Type = "string",
             })
@@ -94,7 +94,7 @@ return function()
         end)
 
         it("should create a typed Flag with default value", function()
-            local flag = Flag.new({
+            const flag = Flag.new({
                 Name = "port",
                 Type = "int",
                 Default = 8080,
@@ -138,7 +138,7 @@ return function()
         end)
 
         it("should validate int type default value", function()
-            local flag = Flag.new({
+            const flag = Flag.new({
                 Name = "count",
                 Type = "int",
                 Default = 5,
@@ -164,7 +164,7 @@ return function()
         end)
 
         it("should allow nil default when no type is specified", function()
-            local flag = Flag.new({
+            const flag = Flag.new({
                 Name = "test",
             })
             expect(flag.Default).to.equal(nil)
@@ -172,11 +172,11 @@ return function()
 
         it("should throw error for invalid Flag options", function()
             expect(function()
-                Flag.new({ InvalidField = "test" })
+                Flag.new({ InvalidField = "test" } :: any)
             end).to.throw()
 
             expect(function()
-                Flag.new("not a table")
+                Flag.new("not a table" :: any)
             end).to.throw()
         end)
 
@@ -184,12 +184,12 @@ return function()
             expect(function()
                 Flag.new({
                     Description = "Missing name",
-                })
+                } :: any)
             end).to.throw()
         end)
 
         it("should create a complex Flag with all options", function()
-            local flag = Flag.new({
+            const flag = Flag.new({
                 Name = "port",
                 Description = "Server port number",
                 Type = "int",

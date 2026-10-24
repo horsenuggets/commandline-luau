@@ -8,15 +8,15 @@ interfaces.
 
 --]]
 
-local Arg = require("@self/Arg")
-local Command = require("@self/Command")
-local Completions = require("@self/Completions")
-local Flag = require("@self/Flag")
-local StringUtils = require("@self/Helpers/StringUtils")
-local Toolkit = require("@self/Toolkit")
-local t = require("@packages/t")
+const Arg = require("@self/Arg")
+const Command = require("@self/Command")
+const Completions = require("@self/Completions")
+const Flag = require("@self/Flag")
+const StringUtils = require("@self/Helpers/StringUtils")
+const Toolkit = require("@self/Toolkit")
+const t = require("@packages/t")
 
-local Commandline = {
+const Commandline = {
     -- Public static properties
     Arg = Arg,
     Command = Command,
@@ -29,7 +29,7 @@ local Commandline = {
 }
 
 function Commandline.registerCommand(command: Command.Command)
-    assert(t.table(command) and getmetatable(command) == Command, "Invalid command provided.")
+    assert(t.table(command) and getmetatable(command :: any) == Command, "Invalid command provided.")
     assert(not Commandline._commands[command.Name], "Command with this name already registered.")
 
     Commandline._commands[command.Name] = command
@@ -39,7 +39,7 @@ function Commandline.execute(rawCommandString: string)
     assert(t.string(rawCommandString), "Invalid command string provided.")
 
     -- Tokenize the command string, respecting quotes and escapes
-    local tokens, tokenizeErr = StringUtils.tokenize(rawCommandString)
+    const tokens, tokenizeErr = StringUtils.tokenize(rawCommandString)
     if tokenizeErr then
         error(tokenizeErr)
     end
@@ -50,15 +50,15 @@ function Commandline.execute(rawCommandString: string)
     end
 
     -- Extract command name
-    local commandName = StringUtils.assertAlphanumericLowercase(tokens[1], "Command name")
+    const commandName = StringUtils.assertAlphanumericLowercase(tokens[1], "Command name")
 
     -- Find the registered command first to get Flag definitions
-    local command = Commandline._commands[commandName]
+    const command = Commandline._commands[commandName]
     if not command then
         error(`Unknown command "{commandName}".`)
     end
 
-    local remainingTokens = {}
+    const remainingTokens = {}
     for i = 2, #tokens do
         table.insert(remainingTokens, tokens[i])
     end

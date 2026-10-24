@@ -7,7 +7,7 @@ strings with support for quotes and escape sequences.
 
 --]]
 
-local StringUtils = {}
+const StringUtils = {}
 
 -- Capitalizes the first letter of a string, leaving the rest unchanged.
 function StringUtils.capitalizeFirstLetter(str: string): string
@@ -62,14 +62,14 @@ Tokenize a command string, respecting quotes and escape sequences.
 
 --]]
 function StringUtils.tokenize(input: string): ({ string }, string?)
-    local tokens = {}
+    const tokens = {}
     local currentToken = {}
     local inQuote = false
     local escaped = false
     local i = 1
 
     while i <= #input do
-        local char = input:sub(i, i)
+        const char = input:sub(i, i)
 
         if escaped then
             -- Process escape sequence

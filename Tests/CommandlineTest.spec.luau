@@ -6,7 +6,7 @@ Tests for the Commandline module, covering exports, command registration, and ex
 
 --]]
 
-local Commandline = require("../Source/Commandline")
+const Commandline = require("../Source/Commandline")
 
 return function()
     beforeEach(function()
@@ -36,7 +36,7 @@ return function()
 
     describe("Commandline.registerCommand", function()
         it("should register a valid command", function()
-            local cmd = Commandline.Command.new({
+            const cmd = Commandline.Command.new({
                 Name = "test",
             })
             Commandline.registerCommand(cmd)
@@ -44,8 +44,8 @@ return function()
         end)
 
         it("should register multiple commands", function()
-            local cmd1 = Commandline.Command.new({ Name = "build" })
-            local cmd2 = Commandline.Command.new({ Name = "test" })
+            const cmd1 = Commandline.Command.new({ Name = "build" })
+            const cmd2 = Commandline.Command.new({ Name = "test" })
 
             Commandline.registerCommand(cmd1)
             Commandline.registerCommand(cmd2)
@@ -55,8 +55,8 @@ return function()
         end)
 
         it("should throw error for duplicate command names", function()
-            local cmd1 = Commandline.Command.new({ Name = "test" })
-            local cmd2 = Commandline.Command.new({ Name = "test" })
+            const cmd1 = Commandline.Command.new({ Name = "test" })
+            const cmd2 = Commandline.Command.new({ Name = "test" })
 
             Commandline.registerCommand(cmd1)
 
@@ -67,11 +67,11 @@ return function()
 
         it("should throw error for invalid command", function()
             expect(function()
-                Commandline.registerCommand("not a command")
+                Commandline.registerCommand("not a command" :: any)
             end).to.throw()
 
             expect(function()
-                Commandline.registerCommand({ Name = "fake" })
+                Commandline.registerCommand({ Name = "fake" } :: any)
             end).to.throw()
         end)
     end)
@@ -79,7 +79,7 @@ return function()
     describe("Commandline.execute", function()
         it("should execute a registered command", function()
             local executed = false
-            local cmd = Commandline.Command.new({
+            const cmd = Commandline.Command.new({
                 Name = "test",
                 Impl = function()
                     executed = true
@@ -92,7 +92,7 @@ return function()
 
         it("should pass arguments to command", function()
             local receivedArgs
-            local cmd = Commandline.Command.new({
+            const cmd = Commandline.Command.new({
                 Name = "greet",
                 Args = {
                     Commandline.Arg.new({ Name = "name" }),
@@ -108,7 +108,7 @@ return function()
 
         it("should handle quoted arguments", function()
             local receivedArgs
-            local cmd = Commandline.Command.new({
+            const cmd = Commandline.Command.new({
                 Name = "echo",
                 Args = {
                     Commandline.Arg.new({ Name = "message" }),
@@ -124,7 +124,7 @@ return function()
 
         it("should handle flags", function()
             local receivedFlags
-            local cmd = Commandline.Command.new({
+            const cmd = Commandline.Command.new({
                 Name = "build",
                 Flags = {
                     Commandline.Flag.new({ Name = "verbose", Shorthand = "v" }),
@@ -140,7 +140,7 @@ return function()
 
         it("should handle shorthand flags", function()
             local receivedFlags
-            local cmd = Commandline.Command.new({
+            const cmd = Commandline.Command.new({
                 Name = "build",
                 Flags = {
                     Commandline.Flag.new({ Name = "verbose", Shorthand = "v" }),
@@ -156,7 +156,7 @@ return function()
 
         it("should handle typed flags with values", function()
             local receivedFlags
-            local cmd = Commandline.Command.new({
+            const cmd = Commandline.Command.new({
                 Name = "serve",
                 Flags = {
                     Commandline.Flag.new({ Name = "port", Type = "int" }),
@@ -172,7 +172,7 @@ return function()
 
         it("should handle complex command strings", function()
             local receivedArgs, receivedFlags
-            local cmd = Commandline.Command.new({
+            const cmd = Commandline.Command.new({
                 Name = "deploy",
                 Args = {
                     Commandline.Arg.new({ Name = "environment" }),
@@ -195,7 +195,7 @@ return function()
 
         it("should execute subcommands", function()
             local subExecuted = false
-            local cmd = Commandline.Command.new({
+            const cmd = Commandline.Command.new({
                 Name = "git",
                 Subcommands = {
                     Commandline.Command.new({
@@ -219,11 +219,11 @@ return function()
 
         it("should throw error for invalid command string", function()
             expect(function()
-                Commandline.execute(123)
+                Commandline.execute(123 :: any)
             end).to.throw()
 
             expect(function()
-                Commandline.execute({ "not", "a", "string" })
+                Commandline.execute({ "not", "a", "string" } :: any)
             end).to.throw()
         end)
 
@@ -249,7 +249,7 @@ return function()
 
         it("should handle commands with multiple arguments", function()
             local receivedArgs
-            local cmd = Commandline.Command.new({
+            const cmd = Commandline.Command.new({
                 Name = "add",
                 Args = {
                     Commandline.Arg.new({ Name = "a", Type = "int" }),
@@ -267,7 +267,7 @@ return function()
 
         it("should handle commands with optional arguments", function()
             local receivedArgs
-            local cmd = Commandline.Command.new({
+            const cmd = Commandline.Command.new({
                 Name = "test",
                 Args = {
                     Commandline.Arg.new({ Name = "required" }),
@@ -289,7 +289,7 @@ return function()
 
         it("should handle escaped characters in command string", function()
             local receivedArgs
-            local cmd = Commandline.Command.new({
+            const cmd = Commandline.Command.new({
                 Name = "echo",
                 Args = {
                     Commandline.Arg.new({ Name = "message" }),
@@ -304,7 +304,7 @@ return function()
         end)
 
         it("should throw error for tokenization errors", function()
-            local cmd = Commandline.Command.new({
+            const cmd = Commandline.Command.new({
                 Name = "test",
                 Impl = function() end,
             })
@@ -325,7 +325,7 @@ return function()
             local buildExecuted = false
             local testExecuted = false
 
-            local buildCmd = Commandline.Command.new({
+            const buildCmd = Commandline.Command.new({
                 Name = "build",
                 Description = "Build the project",
                 Args = {
@@ -344,7 +344,7 @@ return function()
                 end,
             })
 
-            local testCmd = Commandline.Command.new({
+            const testCmd = Commandline.Command.new({
                 Name = "test",
                 Description = "Run tests",
                 Flags = {
