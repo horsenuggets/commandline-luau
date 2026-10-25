@@ -38,7 +38,7 @@ export type ReplacementStep = "MakeExecutable" | "MoveTargetToOld" | "RemoveOld"
 
     Options:
     > IsWindows - Whether the replacement runs on Windows
-    > OldExists - Whether a leftover .old file sits next to the target
+    > OldExists - Whether leftover .old files sit next to the target
     > TargetExists - Whether the target binary already exists
 ]]
 function SelfUpdate.getReplacementSteps(options: {
@@ -56,7 +56,9 @@ function SelfUpdate.getReplacementSteps(options: {
 
     if options.IsWindows then
         -- Windows locks running executables, but renaming one still works. Move the old
-        -- binary aside to .old so the original path is free for the new one.
+        -- binary aside to a free .old path so the original path is free for the new one.
+        -- Leftover .old files are removed first where possible, but one may still be
+        -- running (e.g., a background process started before the last replacement).
         if options.OldExists then
             table.insert(steps, "RemoveOld")
         end
@@ -78,11 +80,78 @@ function SelfUpdate.getReplacementSteps(options: {
 end
 
 --[[
+    Returns the first path a Windows binary can be moved aside to, trying "<target>.old"
+    first and then "<target>.old.1", "<target>.old.2", and so on. Pure, with the paths
+    that are still taken passed in as a set.
+]]
+function SelfUpdate.getFreeOldPath(targetPath: string, takenPaths: { [string]: boolean }): string
+    assert(t.string(targetPath))
+    assert(t.table(takenPaths))
+
+    const oldPath = targetPath .. ".old"
+    if not takenPaths[oldPath] then
+        return oldPath
+    end
+
+    local index = 1
+    while takenPaths[`{oldPath}.{index}`] do
+        index += 1
+    end
+    return `{oldPath}.{index}`
+end
+
+--[[
+    Returns whether a file name is a leftover .old copy of the given binary name (e.g.,
+    "tool.exe.old" or "tool.exe.old.2" for "tool.exe"). Pure.
+]]
+function SelfUpdate.isOldBinaryName(binaryName: string, fileName: string): boolean
+    assert(t.string(binaryName))
+    assert(t.string(fileName))
+
+    const oldName = binaryName .. ".old"
+    if fileName == oldName then
+        return true
+    end
+
+    const prefix = oldName .. "."
+    return string.sub(fileName, 1, #prefix) == prefix
+        and string.match(string.sub(fileName, #prefix + 1), "^%d+$") ~= nil
+end
+
+--[[
+    Lists the leftover .old copies of a binary that sit next to it.
+]]
+function SelfUpdate.findOldBinaries(binaryPath: string): { string }
+    assert(t.string(binaryPath))
+
+    local dir, binaryName = string.match(binaryPath, "^(.*)[/\\]([^/\\]+)$")
+    if not dir then
+        dir, binaryName = ".", binaryPath
+    end
+    assert(dir and binaryName)
+
+    const oldBinaries = {}
+    if not fs.isDir(dir) then
+        return oldBinaries
+    end
+
+    const separator = string.sub(binaryPath, #dir + 1, #dir + 1)
+    for _, entry in fs.readDir(dir) do
+        if SelfUpdate.isOldBinaryName(binaryName, entry) then
+            table.insert(oldBinaries, dir .. separator .. entry)
+        end
+    end
+    table.sort(oldBinaries)
+
+    return oldBinaries
+end
+
+--[[
     Replaces a binary file at the given path with new contents. Handles platform-specific
     locking behavior, and never writes into the existing file (see getReplacementSteps).
 
     On Unix, the running binary is unlinked and replaced directly.
-    On Windows, the running binary is renamed to .old first, then
+    On Windows, the running binary is renamed to a free .old path first, then
     the new binary is written to the original path.
 
     Options:
@@ -100,20 +169,23 @@ function SelfUpdate.replaceBinary(options: {
 
     const targetPath = options.targetPath
     const newContents = options.newContents
-    const oldPath = targetPath .. ".old"
 
     const steps = SelfUpdate.getReplacementSteps({
         IsWindows = IS_WINDOWS,
-        OldExists = fs.isFile(oldPath),
+        OldExists = #SelfUpdate.findOldBinaries(targetPath) > 0,
         TargetExists = fs.isFile(targetPath),
     })
 
     for _, step in steps do
         if step == "RemoveOld" then
-            fs.removeFile(oldPath)
+            SelfUpdate.cleanupOldBinary(targetPath)
         elseif step == "MoveTargetToOld" then
+            const takenPaths = {}
+            for _, path in SelfUpdate.findOldBinaries(targetPath) do
+                takenPaths[path] = true
+            end
             -- A plain rename, which Windows allows even while the binary is running
-            fs.move(targetPath, oldPath)
+            fs.move(targetPath, SelfUpdate.getFreeOldPath(targetPath, takenPaths))
         elseif step == "RemoveTarget" then
             fs.removeFile(targetPath)
         elseif step == "Write" then
@@ -156,16 +228,14 @@ end
 --[[
     Cleans up any leftover .old files from a previous Windows
     update. Should be called early in the CLI startup path.
-    No-op on Unix systems.
+    Files that are still running stay put until a later cleanup.
+    No-op on Unix systems, which never leave .old files behind.
 ]]
 function SelfUpdate.cleanupOldBinary(binaryPath: string)
     assert(t.string(binaryPath))
 
-    const oldPath = binaryPath .. ".old"
-    if fs.isFile(oldPath) then
-        pcall(function()
-            fs.removeFile(oldPath)
-        end)
+    for _, oldPath in SelfUpdate.findOldBinaries(binaryPath) do
+        pcall(fs.removeFile, oldPath)
     end
 end
 

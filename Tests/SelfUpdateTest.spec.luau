@@ -282,7 +282,80 @@ return function()
         end)
     end)
 
+    describe("getFreeOldPath", function()
+        it("should use .old when it is free", function()
+            expect(SelfUpdate.getFreeOldPath("C:/bin/tool.exe", {})).to.equal("C:/bin/tool.exe.old")
+        end)
+
+        it("should skip paths that are still taken", function()
+            expect(SelfUpdate.getFreeOldPath("C:/bin/tool.exe", {
+                ["C:/bin/tool.exe.old"] = true,
+            })).to.equal("C:/bin/tool.exe.old.1")
+
+            expect(SelfUpdate.getFreeOldPath("C:/bin/tool.exe", {
+                ["C:/bin/tool.exe.old"] = true,
+                ["C:/bin/tool.exe.old.1"] = true,
+                ["C:/bin/tool.exe.old.2"] = true,
+            })).to.equal("C:/bin/tool.exe.old.3")
+        end)
+
+        it("should reuse a gap left by a removed path", function()
+            expect(SelfUpdate.getFreeOldPath("C:/bin/tool.exe", {
+                ["C:/bin/tool.exe.old.1"] = true,
+            })).to.equal("C:/bin/tool.exe.old")
+        end)
+    end)
+
+    describe("isOldBinaryName", function()
+        it("should match .old and numbered .old names", function()
+            expect(SelfUpdate.isOldBinaryName("tool.exe", "tool.exe.old")).to.equal(true)
+            expect(SelfUpdate.isOldBinaryName("tool.exe", "tool.exe.old.1")).to.equal(true)
+            expect(SelfUpdate.isOldBinaryName("tool.exe", "tool.exe.old.42")).to.equal(true)
+        end)
+
+        it("should not match other files", function()
+            expect(SelfUpdate.isOldBinaryName("tool.exe", "tool.exe")).to.equal(false)
+            expect(SelfUpdate.isOldBinaryName("tool.exe", "tool.exe.old.")).to.equal(false)
+            expect(SelfUpdate.isOldBinaryName("tool.exe", "tool.exe.old.bak")).to.equal(false)
+            expect(SelfUpdate.isOldBinaryName("tool.exe", "tool.exe.older")).to.equal(false)
+            expect(SelfUpdate.isOldBinaryName("tool.exe", "other.exe.old")).to.equal(false)
+            expect(SelfUpdate.isOldBinaryName("tool", "tool.exe.old")).to.equal(false)
+        end)
+    end)
+
+    describe("findOldBinaries", function()
+        it("should list only the leftover .old copies of the binary", function()
+            const dir = createTempDir()
+            const binaryPath = dir .. "/tool"
+
+            for _, fileName in { "tool", "tool.old", "tool.old.1", "tool.old.bak", "other.old" } do
+                fs.writeFile(dir .. "/" .. fileName, "")
+            end
+
+            const found = SelfUpdate.findOldBinaries(binaryPath)
+            expect(table.concat(found, ",")).to.equal(`{binaryPath}.old,{binaryPath}.old.1`)
+            removeTempDir(dir)
+        end)
+
+        it("should return nothing when the directory does not exist", function()
+            expect(#SelfUpdate.findOldBinaries("/nonexistent-dir-" .. tostring(os.time()) .. "/tool")).to.equal(0)
+        end)
+    end)
+
     describe("cleanupOldBinary", function()
+        it("should remove numbered .old files too", function()
+            const dir = createTempDir()
+            const binaryPath = dir .. "/tool"
+
+            fs.writeFile(binaryPath .. ".old", "stale binary")
+            fs.writeFile(binaryPath .. ".old.1", "stale binary")
+            SelfUpdate.cleanupOldBinary(binaryPath)
+
+            expect(fs.isFile(binaryPath .. ".old")).to.equal(false)
+            expect(fs.isFile(binaryPath .. ".old.1")).to.equal(false)
+            removeTempDir(dir)
+        end)
+
         it("should remove .old file if it exists", function()
             const dir = createTempDir()
             const binaryPath = dir .. "/tool"
