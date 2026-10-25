@@ -23,9 +23,63 @@ const IS_WINDOWS = process.os == "windows"
 
 const SelfUpdate = {}
 
+export type ReplacementStep = "MakeExecutable" | "MoveTargetToOld" | "RemoveOld" | "RemoveTarget" | "Write"
+
 --[[
-    Replaces a binary file at the given path with new contents.
-    Handles platform-specific locking behavior.
+    Returns the ordered steps needed to replace a binary without ever writing into the
+    file a running process may be executing. Pure, so the decision can be tested on any
+    platform.
+
+    Writing over an executable in place is never safe. On macOS, changing the pages of a
+    running signed binary invalidates its code signature and the kernel kills the process
+    with SIGKILL. Windows refuses the write entirely while the binary is running. Both
+    platforms are fine once the old file is out of the way, so the new contents always
+    land in a fresh file.
+
+    Options:
+    > IsWindows - Whether the replacement runs on Windows
+    > OldExists - Whether a leftover .old file sits next to the target
+    > TargetExists - Whether the target binary already exists
+]]
+function SelfUpdate.getReplacementSteps(options: {
+    IsWindows: boolean,
+    OldExists: boolean,
+    TargetExists: boolean,
+}): { ReplacementStep }
+    assert(t.interface({
+        IsWindows = t.boolean,
+        OldExists = t.boolean,
+        TargetExists = t.boolean,
+    })(options))
+
+    const steps: { ReplacementStep } = {}
+
+    if options.IsWindows then
+        -- Windows locks running executables, but renaming one still works. Move the old
+        -- binary aside to .old so the original path is free for the new one.
+        if options.OldExists then
+            table.insert(steps, "RemoveOld")
+        end
+        if options.TargetExists then
+            table.insert(steps, "MoveTargetToOld")
+        end
+        table.insert(steps, "Write")
+    else
+        -- Unlinking only drops the directory entry. The kernel keeps the old inode alive
+        -- for any process still running it, and the write creates a brand new inode.
+        if options.TargetExists then
+            table.insert(steps, "RemoveTarget")
+        end
+        table.insert(steps, "Write")
+        table.insert(steps, "MakeExecutable")
+    end
+
+    return steps
+end
+
+--[[
+    Replaces a binary file at the given path with new contents. Handles platform-specific
+    locking behavior, and never writes into the existing file (see getReplacementSteps).
 
     On Unix, the running binary is unlinked and replaced directly.
     On Windows, the running binary is renamed to .old first, then
@@ -46,29 +100,57 @@ function SelfUpdate.replaceBinary(options: {
 
     const targetPath = options.targetPath
     const newContents = options.newContents
+    const oldPath = targetPath .. ".old"
 
-    if IS_WINDOWS then
-        -- Windows locks running executables. Rename the old binary
-        -- first (rename works even on locked files), then write the
-        -- new one to the original path.
-        const oldPath = targetPath .. ".old"
-        if fs.isFile(oldPath) then
+    const steps = SelfUpdate.getReplacementSteps({
+        IsWindows = IS_WINDOWS,
+        OldExists = fs.isFile(oldPath),
+        TargetExists = fs.isFile(targetPath),
+    })
+
+    for _, step in steps do
+        if step == "RemoveOld" then
             fs.removeFile(oldPath)
-        end
-        if fs.isFile(targetPath) then
-            -- Use OS rename since fs doesn't have a rename function
-            process.exec("cmd", { "/c", "move", "/Y", targetPath, oldPath })
-        end
-        fs.writeFile(targetPath, newContents)
-    else
-        -- Unix: unlink and replace. The kernel keeps the old inode
-        -- alive for the running process via reference counting.
-        if fs.isFile(targetPath) then
+        elseif step == "MoveTargetToOld" then
+            -- A plain rename, which Windows allows even while the binary is running
+            fs.move(targetPath, oldPath)
+        elseif step == "RemoveTarget" then
             fs.removeFile(targetPath)
+        elseif step == "Write" then
+            fs.writeFile(targetPath, newContents)
+        elseif step == "MakeExecutable" then
+            const result = process.exec("chmod", { "+x", targetPath })
+            if not result.ok then
+                error(`Failed to make "{targetPath}" executable. {result.stderr}`)
+            end
         end
-        fs.writeFile(targetPath, newContents)
-        process.exec("chmod", { "+x", targetPath })
     end
+end
+
+--[[
+    Copies a binary to the given path through replaceBinary, so the destination is never
+    written in place. The source is read in full before anything is replaced, which makes
+    copying a binary onto itself (e.g., the installed binary running its own install
+    command) safe.
+
+    Options:
+    > sourcePath - Path to the binary to copy
+    > targetPath - Path to write the copy to
+]]
+function SelfUpdate.copyBinary(options: {
+    sourcePath: string,
+    targetPath: string,
+})
+    assert(t.interface({
+        sourcePath = t.string,
+        targetPath = t.string,
+    })(options))
+
+    const contents = fs.readFile(options.sourcePath)
+    SelfUpdate.replaceBinary({
+        targetPath = options.targetPath,
+        newContents = contents,
+    })
 end
 
 --[[

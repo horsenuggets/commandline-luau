@@ -380,7 +380,7 @@ function Toolkit.installCommand(options: {
     }
     const XSH_PATH_FILE = HOME_DIR .. "/.path"
 
-    const function downloadLatestBinary(destPath: string): boolean
+    const function downloadLatestBinary(): string?
         const url = `https://api.github.com/repos/{repository}/releases/latest`
         const ok, response = pcall(net.request, {
             url = url,
@@ -390,13 +390,13 @@ function Toolkit.installCommand(options: {
 
         if not ok or not response.ok then
             print(Chalk.red("Failed to fetch latest release."))
-            return false
+            return nil
         end
 
         const success, release = pcall(serde.decode, "json" :: "json", response.body)
         if not success then
             print(Chalk.red("Failed to parse release data."))
-            return false
+            return nil
         end
 
         const platformSuffix = SelfUpdate.getPlatformSuffix()
@@ -412,7 +412,7 @@ function Toolkit.installCommand(options: {
 
         if not downloadUrl then
             print(Chalk.red(`Asset "{assetName}" not found in latest release.`))
-            return false
+            return nil
         end
 
         const dlOk, dlResponse = pcall(net.request, {
@@ -423,15 +423,10 @@ function Toolkit.installCommand(options: {
 
         if not dlOk or not dlResponse.ok then
             print(Chalk.red("Failed to download binary."))
-            return false
+            return nil
         end
 
-        fs.writeFile(destPath, dlResponse.body)
-        if not IS_WINDOWS then
-            process.exec("chmod", { "+x", destPath })
-        end
-
-        return true
+        return dlResponse.body
     end
 
     const function addToPath()
@@ -497,22 +492,29 @@ function Toolkit.installCommand(options: {
 
             const binaryPath = `{BIN_DIR}/{name}{EXECUTABLE_SUFFIX}`
 
-            -- Try to copy current running binary first
+            -- Try to copy current running binary first. Both paths go through
+            -- SelfUpdate so the installed binary is replaced rather than overwritten,
+            -- which keeps any running copy (including this one) alive.
             const currentExe = SelfUpdate.findExecutable(name)
             if currentExe then
-                const contents = fs.readFile(currentExe)
-                fs.writeFile(binaryPath, contents)
-                if not IS_WINDOWS then
-                    process.exec("chmod", { "+x", binaryPath })
-                end
+                SelfUpdate.copyBinary({
+                    sourcePath = currentExe,
+                    targetPath = binaryPath,
+                })
                 print(`Copied executable to {Chalk.dim(binaryPath)}.`)
             else
                 -- Download from GitHub releases
                 print("Downloading binary...")
-                if not downloadLatestBinary(binaryPath) then
+                const contents = downloadLatestBinary()
+                if not contents then
                     print(Chalk.red("Failed to install. Could not download binary."))
                     process.exit(1)
+                    return
                 end
+                SelfUpdate.replaceBinary({
+                    targetPath = binaryPath,
+                    newContents = contents,
+                })
                 print("Downloaded successfully.")
             end
 
