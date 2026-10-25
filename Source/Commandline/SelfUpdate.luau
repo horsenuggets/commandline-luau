@@ -2,16 +2,16 @@
 
 SelfUpdate
 
-Cross-platform binary self-replacement utilities. Handles the
-platform-specific details of replacing a running executable:
+Cross-platform binary self-replacement utilities. Handles the platform-specific details
+of replacing a running executable without ever writing into it...
 
-> Unix (macOS/Linux) - The kernel keeps the old inode alive
->   via reference counting even after unlinking, so we can
->   simply delete and replace the file while the process runs.
+> Unix (macOS/Linux) - The kernel keeps the old inode alive via reference counting even
+>   after unlinking, so we delete the file and write the new one to a fresh inode while
+>   the process runs.
 
-> Windows - The OS locks the running binary. We rename the
->   running binary to .old, write the new binary in its place,
->   and clean up the .old file on the next invocation.
+> Windows - The OS locks the running binary. We rename it to the first free .old or
+>   .old.N path, write the new binary in its place, and clean up the old copies once
+>   they stop running.
 
 --]]
 
