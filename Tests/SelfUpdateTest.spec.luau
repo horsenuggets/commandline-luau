@@ -355,6 +355,29 @@ return function()
             removeTempDir(dir)
         end)
 
+        if not IS_WINDOWS then
+            it("should return nothing and still allow replacement in an unreadable directory", function()
+                -- Write and search permission without read, so files can be replaced
+                -- but the directory can't be listed
+                const dir = createTempDir()
+                const binaryPath = dir .. "/tool"
+                fs.writeFile(binaryPath, "old binary")
+                expect(process.exec("chmod", { "300", dir }).ok).to.equal(true)
+
+                const found = SelfUpdate.findOldBinaries(binaryPath)
+                const ok = pcall(SelfUpdate.replaceBinary, {
+                    targetPath = binaryPath,
+                    newContents = "new binary",
+                })
+
+                process.exec("chmod", { "700", dir })
+                expect(#found).to.equal(0)
+                expect(ok).to.equal(true)
+                expect(fs.readFile(binaryPath)).to.equal("new binary")
+                removeTempDir(dir)
+            end)
+        end
+
         it("should return nothing when the directory does not exist", function()
             expect(#SelfUpdate.findOldBinaries("/nonexistent-dir-" .. tostring(os.time()) .. "/tool")).to.equal(0)
         end)

@@ -131,7 +131,7 @@ end
 
 --[[
     Lists the leftover .old copies of a binary that sit next to it, in the same form as
-    the given path.
+    the given path. Returns nothing if the directory is missing or can't be read.
 ]]
 function SelfUpdate.findOldBinaries(binaryPath: string): { string }
     assert(t.string(binaryPath))
@@ -140,11 +140,12 @@ function SelfUpdate.findOldBinaries(binaryPath: string): { string }
     const dir = if prefix == "" then "." else prefix
 
     const oldBinaries = {}
-    if not fs.isDir(dir) then
+    const ok, entries = pcall(fs.readDir, dir)
+    if not ok then
         return oldBinaries
     end
 
-    for _, entry in fs.readDir(dir) do
+    for _, entry in entries do
         if SelfUpdate.isOldBinaryName(binaryName, entry) then
             table.insert(oldBinaries, prefix .. entry)
         end
@@ -180,7 +181,8 @@ function SelfUpdate.replaceBinary(options: {
 
     const steps = SelfUpdate.getReplacementSteps({
         IsWindows = IS_WINDOWS,
-        OldExists = #SelfUpdate.findOldBinaries(targetPath) > 0,
+        -- Only Windows leaves .old files behind, so Unix skips listing the directory
+        OldExists = IS_WINDOWS and #SelfUpdate.findOldBinaries(targetPath) > 0,
         TargetExists = fs.isFile(targetPath),
     })
 
