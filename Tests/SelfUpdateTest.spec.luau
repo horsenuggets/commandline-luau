@@ -323,6 +323,24 @@ return function()
         end)
     end)
 
+    describe("splitBinaryPath", function()
+        it("should split at the last separator and keep it in the prefix", function()
+            const cases = {
+                { "/usr/local/bin/tool", "/usr/local/bin/", "tool" },
+                { "C:\\Users\\me\\bin\\tool.exe", "C:\\Users\\me\\bin\\", "tool.exe" },
+                { "C:\\Users\\me/.tool/bin/tool.exe", "C:\\Users\\me/.tool/bin/", "tool.exe" },
+                { "/tool", "/", "tool" },
+                { "tool", "", "tool" },
+            }
+
+            for _, case in cases do
+                const prefix, name = SelfUpdate.splitBinaryPath(case[1])
+                expect(prefix).to.equal(case[2])
+                expect(name).to.equal(case[3])
+            end
+        end)
+    end)
+
     describe("findOldBinaries", function()
         it("should list only the leftover .old copies of the binary", function()
             const dir = createTempDir()

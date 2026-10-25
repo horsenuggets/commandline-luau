@@ -119,26 +119,34 @@ function SelfUpdate.isOldBinaryName(binaryName: string, fileName: string): boole
 end
 
 --[[
-    Lists the leftover .old copies of a binary that sit next to it.
+    Splits a binary path into its directory prefix (everything up to and including the
+    last "/" or "\", or an empty string for a bare file name) and its file name. Pure.
+]]
+function SelfUpdate.splitBinaryPath(binaryPath: string): (string, string)
+    assert(t.string(binaryPath))
+
+    const prefix = string.match(binaryPath, "^(.*[/\\])") or ""
+    return prefix, string.sub(binaryPath, #prefix + 1)
+end
+
+--[[
+    Lists the leftover .old copies of a binary that sit next to it, in the same form as
+    the given path.
 ]]
 function SelfUpdate.findOldBinaries(binaryPath: string): { string }
     assert(t.string(binaryPath))
 
-    local dir, binaryName = string.match(binaryPath, "^(.*)[/\\]([^/\\]+)$")
-    if not dir then
-        dir, binaryName = ".", binaryPath
-    end
-    assert(dir and binaryName)
+    const prefix, binaryName = SelfUpdate.splitBinaryPath(binaryPath)
+    const dir = if prefix == "" then "." else prefix
 
     const oldBinaries = {}
     if not fs.isDir(dir) then
         return oldBinaries
     end
 
-    const separator = string.sub(binaryPath, #dir + 1, #dir + 1)
     for _, entry in fs.readDir(dir) do
         if SelfUpdate.isOldBinaryName(binaryName, entry) then
-            table.insert(oldBinaries, dir .. separator .. entry)
+            table.insert(oldBinaries, prefix .. entry)
         end
     end
     table.sort(oldBinaries)
