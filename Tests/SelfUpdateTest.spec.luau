@@ -282,44 +282,90 @@ return function()
         end)
     end)
 
+    describe("pathKey", function()
+        it("should lowercase only when ignoring case", function()
+            expect(SelfUpdate.pathKey("C:/Bin/Tool.EXE.old", true)).to.equal("c:/bin/tool.exe.old")
+            expect(SelfUpdate.pathKey("C:/Bin/Tool.EXE.old", false)).to.equal("C:/Bin/Tool.EXE.old")
+        end)
+    end)
+
     describe("getFreeOldPath", function()
+        const function taken(paths: { string }, ignoreCase: boolean): { [string]: boolean }
+            const set = {}
+            for _, path in paths do
+                set[SelfUpdate.pathKey(path, ignoreCase)] = true
+            end
+            return set
+        end
+
         it("should use .old when it is free", function()
-            expect(SelfUpdate.getFreeOldPath("C:/bin/tool.exe", {})).to.equal("C:/bin/tool.exe.old")
+            for _, ignoreCase in { true, false } do
+                expect(SelfUpdate.getFreeOldPath("C:/bin/tool.exe", {}, ignoreCase)).to.equal("C:/bin/tool.exe.old")
+            end
         end)
 
         it("should skip paths that are still taken", function()
-            expect(SelfUpdate.getFreeOldPath("C:/bin/tool.exe", {
-                ["C:/bin/tool.exe.old"] = true,
-            })).to.equal("C:/bin/tool.exe.old.1")
-
-            expect(SelfUpdate.getFreeOldPath("C:/bin/tool.exe", {
-                ["C:/bin/tool.exe.old"] = true,
-                ["C:/bin/tool.exe.old.1"] = true,
-                ["C:/bin/tool.exe.old.2"] = true,
-            })).to.equal("C:/bin/tool.exe.old.3")
+            for _, ignoreCase in { true, false } do
+                expect(
+                    SelfUpdate.getFreeOldPath(
+                        "C:/bin/tool.exe",
+                        taken({ "C:/bin/tool.exe.old" }, ignoreCase),
+                        ignoreCase
+                    )
+                ).to.equal("C:/bin/tool.exe.old.1")
+                expect(
+                    SelfUpdate.getFreeOldPath(
+                        "C:/bin/tool.exe",
+                        taken({ "C:/bin/tool.exe.old", "C:/bin/tool.exe.old.1", "C:/bin/tool.exe.old.2" }, ignoreCase),
+                        ignoreCase
+                    )
+                ).to.equal("C:/bin/tool.exe.old.3")
+            end
         end)
 
         it("should reuse a gap left by a removed path", function()
-            expect(SelfUpdate.getFreeOldPath("C:/bin/tool.exe", {
-                ["C:/bin/tool.exe.old.1"] = true,
-            })).to.equal("C:/bin/tool.exe.old")
+            expect(SelfUpdate.getFreeOldPath("C:/bin/tool.exe", taken({ "C:/bin/tool.exe.old.1" }, true), true)).to.equal(
+                "C:/bin/tool.exe.old"
+            )
+        end)
+
+        it("should treat differently cased leftovers as taken when ignoring case", function()
+            const leftovers = { "C:/BIN/Tool.EXE.OLD", "c:/bin/TOOL.exe.Old.1" }
+            expect(SelfUpdate.getFreeOldPath("C:/bin/tool.exe", taken(leftovers, true), true)).to.equal(
+                "C:/bin/tool.exe.old.2"
+            )
+            -- Case-sensitive file systems see different names, so .old is still free
+            expect(SelfUpdate.getFreeOldPath("C:/bin/tool.exe", taken(leftovers, false), false)).to.equal(
+                "C:/bin/tool.exe.old"
+            )
         end)
     end)
 
     describe("isOldBinaryName", function()
         it("should match .old and numbered .old names", function()
-            expect(SelfUpdate.isOldBinaryName("tool.exe", "tool.exe.old")).to.equal(true)
-            expect(SelfUpdate.isOldBinaryName("tool.exe", "tool.exe.old.1")).to.equal(true)
-            expect(SelfUpdate.isOldBinaryName("tool.exe", "tool.exe.old.42")).to.equal(true)
+            for _, ignoreCase in { true, false } do
+                expect(SelfUpdate.isOldBinaryName("tool.exe", "tool.exe.old", ignoreCase)).to.equal(true)
+                expect(SelfUpdate.isOldBinaryName("tool.exe", "tool.exe.old.1", ignoreCase)).to.equal(true)
+                expect(SelfUpdate.isOldBinaryName("tool.exe", "tool.exe.old.42", ignoreCase)).to.equal(true)
+            end
         end)
 
         it("should not match other files", function()
-            expect(SelfUpdate.isOldBinaryName("tool.exe", "tool.exe")).to.equal(false)
-            expect(SelfUpdate.isOldBinaryName("tool.exe", "tool.exe.old.")).to.equal(false)
-            expect(SelfUpdate.isOldBinaryName("tool.exe", "tool.exe.old.bak")).to.equal(false)
-            expect(SelfUpdate.isOldBinaryName("tool.exe", "tool.exe.older")).to.equal(false)
-            expect(SelfUpdate.isOldBinaryName("tool.exe", "other.exe.old")).to.equal(false)
-            expect(SelfUpdate.isOldBinaryName("tool", "tool.exe.old")).to.equal(false)
+            for _, ignoreCase in { true, false } do
+                for _, fileName in
+                    { "tool.exe", "tool.exe.old.", "tool.exe.old.bak", "tool.exe.older", "other.exe.old" }
+                do
+                    expect(SelfUpdate.isOldBinaryName("tool.exe", fileName, ignoreCase)).to.equal(false)
+                end
+                expect(SelfUpdate.isOldBinaryName("tool", "tool.exe.old", ignoreCase)).to.equal(false)
+            end
+        end)
+
+        it("should match differently cased names only when ignoring case", function()
+            for _, fileName in { "Tool.EXE.old", "TOOL.EXE.OLD.3", "tool.exe.Old" } do
+                expect(SelfUpdate.isOldBinaryName("tool.exe", fileName, true)).to.equal(true)
+                expect(SelfUpdate.isOldBinaryName("tool.exe", fileName, false)).to.equal(false)
+            end
         end)
     end)
 
@@ -350,8 +396,18 @@ return function()
                 fs.writeFile(dir .. "/" .. fileName, "")
             end
 
-            const found = SelfUpdate.findOldBinaries(binaryPath)
+            const found = SelfUpdate.findOldBinaries(binaryPath, false)
             expect(table.concat(found, ",")).to.equal(`{binaryPath}.old,{binaryPath}.old.1`)
+            removeTempDir(dir)
+        end)
+
+        it("should find differently cased leftovers only when ignoring case", function()
+            const dir = createTempDir()
+            const binaryPath = dir .. "/tool"
+            fs.writeFile(dir .. "/TOOL.OLD.2", "")
+
+            expect(table.concat(SelfUpdate.findOldBinaries(binaryPath, true), ",")).to.equal(`{dir}/TOOL.OLD.2`)
+            expect(#SelfUpdate.findOldBinaries(binaryPath, false)).to.equal(0)
             removeTempDir(dir)
         end)
 
@@ -364,7 +420,7 @@ return function()
                 fs.writeFile(binaryPath, "old binary")
                 expect(process.exec("chmod", { "300", dir }).ok).to.equal(true)
 
-                const found = SelfUpdate.findOldBinaries(binaryPath)
+                const found = SelfUpdate.findOldBinaries(binaryPath, false)
                 const ok = pcall(SelfUpdate.replaceBinary, {
                     targetPath = binaryPath,
                     newContents = "new binary",
@@ -379,7 +435,9 @@ return function()
         end
 
         it("should return nothing when the directory does not exist", function()
-            expect(#SelfUpdate.findOldBinaries("/nonexistent-dir-" .. tostring(os.time()) .. "/tool")).to.equal(0)
+            expect(#SelfUpdate.findOldBinaries("/nonexistent-dir-" .. tostring(os.time()) .. "/tool", false)).to.equal(
+                0
+            )
         end)
     end)
 

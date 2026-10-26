@@ -80,21 +80,37 @@ function SelfUpdate.getReplacementSteps(options: {
 end
 
 --[[
+    Returns the key a path is compared by. Windows file names ignore case, so "Tool.EXE.old"
+    and "tool.exe.old" name the same file there and must compare equal. Pure.
+]]
+function SelfUpdate.pathKey(path: string, ignoreCase: boolean): string
+    assert(t.string(path))
+    assert(t.boolean(ignoreCase))
+
+    return if ignoreCase then string.lower(path) else path
+end
+
+--[[
     Returns the first path a Windows binary can be moved aside to, trying "<target>.old"
     first and then "<target>.old.1", "<target>.old.2", and so on. Pure, with the paths
-    that are still taken passed in as a set.
+    that are still taken passed in as a set keyed by pathKey with the same ignoreCase.
 ]]
-function SelfUpdate.getFreeOldPath(targetPath: string, takenPaths: { [string]: boolean }): string
+function SelfUpdate.getFreeOldPath(targetPath: string, takenPaths: { [string]: boolean }, ignoreCase: boolean): string
     assert(t.string(targetPath))
     assert(t.table(takenPaths))
+    assert(t.boolean(ignoreCase))
+
+    const function isTaken(path: string): boolean
+        return takenPaths[SelfUpdate.pathKey(path, ignoreCase)] == true
+    end
 
     const oldPath = targetPath .. ".old"
-    if not takenPaths[oldPath] then
+    if not isTaken(oldPath) then
         return oldPath
     end
 
     local index = 1
-    while takenPaths[`{oldPath}.{index}`] do
+    while isTaken(`{oldPath}.{index}`) do
         index += 1
     end
     return `{oldPath}.{index}`
@@ -102,11 +118,16 @@ end
 
 --[[
     Returns whether a file name is a leftover .old copy of the given binary name (e.g.,
-    "tool.exe.old" or "tool.exe.old.2" for "tool.exe"). Pure.
+    "tool.exe.old" or "tool.exe.old.2" for "tool.exe"), comparing without case when
+    ignoreCase is set. Pure.
 ]]
-function SelfUpdate.isOldBinaryName(binaryName: string, fileName: string): boolean
+function SelfUpdate.isOldBinaryName(binaryName: string, fileName: string, ignoreCase: boolean): boolean
     assert(t.string(binaryName))
     assert(t.string(fileName))
+    assert(t.boolean(ignoreCase))
+
+    binaryName = SelfUpdate.pathKey(binaryName, ignoreCase)
+    fileName = SelfUpdate.pathKey(fileName, ignoreCase)
 
     const oldName = binaryName .. ".old"
     if fileName == oldName then
@@ -131,10 +152,12 @@ end
 
 --[[
     Lists the leftover .old copies of a binary that sit next to it, in the same form as
-    the given path. Returns nothing if the directory is missing or can't be read.
+    the given path. Names match without case when ignoreCase is set, as on Windows. Returns
+    nothing if the directory is missing or can't be read.
 ]]
-function SelfUpdate.findOldBinaries(binaryPath: string): { string }
+function SelfUpdate.findOldBinaries(binaryPath: string, ignoreCase: boolean): { string }
     assert(t.string(binaryPath))
+    assert(t.boolean(ignoreCase))
 
     const prefix, binaryName = SelfUpdate.splitBinaryPath(binaryPath)
     const dir = if prefix == "" then "." else prefix
@@ -146,7 +169,7 @@ function SelfUpdate.findOldBinaries(binaryPath: string): { string }
     end
 
     for _, entry in entries do
-        if SelfUpdate.isOldBinaryName(binaryName, entry) then
+        if SelfUpdate.isOldBinaryName(binaryName, entry, ignoreCase) then
             table.insert(oldBinaries, prefix .. entry)
         end
     end
@@ -182,7 +205,7 @@ function SelfUpdate.replaceBinary(options: {
     const steps = SelfUpdate.getReplacementSteps({
         IsWindows = IS_WINDOWS,
         -- Only Windows leaves .old files behind, so Unix skips listing the directory
-        OldExists = IS_WINDOWS and #SelfUpdate.findOldBinaries(targetPath) > 0,
+        OldExists = IS_WINDOWS and #SelfUpdate.findOldBinaries(targetPath, IS_WINDOWS) > 0,
         TargetExists = fs.isFile(targetPath),
     })
 
@@ -191,11 +214,11 @@ function SelfUpdate.replaceBinary(options: {
             SelfUpdate.cleanupOldBinary(targetPath)
         elseif step == "MoveTargetToOld" then
             const takenPaths = {}
-            for _, path in SelfUpdate.findOldBinaries(targetPath) do
-                takenPaths[path] = true
+            for _, path in SelfUpdate.findOldBinaries(targetPath, IS_WINDOWS) do
+                takenPaths[SelfUpdate.pathKey(path, IS_WINDOWS)] = true
             end
             -- A plain rename, which Windows allows even while the binary is running
-            fs.move(targetPath, SelfUpdate.getFreeOldPath(targetPath, takenPaths))
+            fs.move(targetPath, SelfUpdate.getFreeOldPath(targetPath, takenPaths, IS_WINDOWS))
         elseif step == "RemoveTarget" then
             fs.removeFile(targetPath)
         elseif step == "Write" then
@@ -244,7 +267,7 @@ end
 function SelfUpdate.cleanupOldBinary(binaryPath: string)
     assert(t.string(binaryPath))
 
-    for _, oldPath in SelfUpdate.findOldBinaries(binaryPath) do
+    for _, oldPath in SelfUpdate.findOldBinaries(binaryPath, IS_WINDOWS) do
         pcall(fs.removeFile, oldPath)
     end
 end
