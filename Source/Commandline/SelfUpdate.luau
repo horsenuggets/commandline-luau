@@ -2,33 +2,258 @@
 
 SelfUpdate
 
-Cross-platform binary self-replacement utilities. Handles the
-platform-specific details of replacing a running executable:
+Cross-platform binary self-replacement utilities. Handles the platform-specific details
+of replacing a running executable without ever writing into it...
 
-> Unix (macOS/Linux) - The kernel keeps the old inode alive
->   via reference counting even after unlinking, so we can
->   simply delete and replace the file while the process runs.
+> Unix (macOS/Linux) - The kernel keeps the old inode alive via reference counting even
+>   after unlinking, so we delete the file and write the new one to a fresh inode while
+>   the process runs.
 
-> Windows - The OS locks the running binary. We rename the
->   running binary to .old, write the new binary in its place,
->   and clean up the .old file on the next invocation.
+> Windows - The OS locks the running binary. We rename it to the first free .old or
+>   .old.N path, write the new binary in its place, and clean up the old copies once
+>   they stop running.
 
 --]]
 
-local fs = require("@lune/fs")
-local process = require("@lune/process")
-local t = require("@packages/t")
+const fs = require("@lune/fs")
+const process = require("@lune/process")
+const t = require("@packages/t")
 
-local IS_WINDOWS = process.os == "windows"
+const IS_WINDOWS = process.os == "windows"
 
-local SelfUpdate = {}
+const SelfUpdate = {}
+
+export type ReplacementStep = "MakeExecutable" | "MoveTargetToOld" | "RemoveOld" | "RemoveTarget" | "Write"
 
 --[[
-    Replaces a binary file at the given path with new contents.
-    Handles platform-specific locking behavior.
+    Returns the ordered steps needed to replace a binary without ever writing into the
+    file a running process may be executing. Pure, so the decision can be tested on any
+    platform.
+
+    Writing over an executable in place is never safe. On macOS, changing the pages of a
+    running signed binary invalidates its code signature and the kernel kills the process
+    with SIGKILL. Windows refuses the write entirely while the binary is running. Both
+    platforms are fine once the old file is out of the way, so the new contents always
+    land in a fresh file.
+
+    Options:
+    > IsWindows - Whether the replacement runs on Windows
+    > OldExists - Whether leftover .old files sit next to the target
+    > TargetExists - Whether the target binary already exists
+]]
+function SelfUpdate.getReplacementSteps(options: {
+    IsWindows: boolean,
+    OldExists: boolean,
+    TargetExists: boolean,
+}): { ReplacementStep }
+    assert(t.interface({
+        IsWindows = t.boolean,
+        OldExists = t.boolean,
+        TargetExists = t.boolean,
+    })(options))
+
+    const steps: { ReplacementStep } = {}
+
+    if options.IsWindows then
+        -- Windows locks running executables, but renaming one still works. Move the old
+        -- binary aside to a free .old path so the original path is free for the new one.
+        -- Leftover .old files are removed first where possible, but one may still be
+        -- running (e.g., a background process started before the last replacement).
+        if options.OldExists then
+            table.insert(steps, "RemoveOld")
+        end
+        if options.TargetExists then
+            table.insert(steps, "MoveTargetToOld")
+        end
+        table.insert(steps, "Write")
+    else
+        -- Unlinking only drops the directory entry. The kernel keeps the old inode alive
+        -- for any process still running it, and the write creates a brand new inode.
+        if options.TargetExists then
+            table.insert(steps, "RemoveTarget")
+        end
+        table.insert(steps, "Write")
+        table.insert(steps, "MakeExecutable")
+    end
+
+    return steps
+end
+
+--[[
+    Returns the key a path is compared by. Windows file names ignore case, so "Tool.EXE.old"
+    and "tool.exe.old" name the same file there and must compare equal. Pure.
+]]
+function SelfUpdate.pathKey(path: string, ignoreCase: boolean): string
+    assert(t.string(path))
+    assert(t.boolean(ignoreCase))
+
+    return if ignoreCase then string.lower(path) else path
+end
+
+--[[
+    Returns the first path a Windows binary can be moved aside to, trying "<target>.old"
+    first and then "<target>.old.1", "<target>.old.2", and so on. Pure, with the paths
+    that are still taken passed in as a set keyed by pathKey with the same ignoreCase.
+]]
+function SelfUpdate.getFreeOldPath(targetPath: string, takenPaths: { [string]: boolean }, ignoreCase: boolean): string
+    assert(t.string(targetPath))
+    assert(t.table(takenPaths))
+    assert(t.boolean(ignoreCase))
+
+    const function isTaken(path: string): boolean
+        return takenPaths[SelfUpdate.pathKey(path, ignoreCase)] == true
+    end
+
+    const oldPath = targetPath .. ".old"
+    if not isTaken(oldPath) then
+        return oldPath
+    end
+
+    local index = 1
+    while isTaken(`{oldPath}.{index}`) do
+        index += 1
+    end
+    return `{oldPath}.{index}`
+end
+
+--[[
+    Returns whether a file name is a leftover .old copy of the given binary name (e.g.,
+    "tool.exe.old" or "tool.exe.old.2" for "tool.exe"), comparing without case when
+    ignoreCase is set. Pure.
+]]
+function SelfUpdate.isOldBinaryName(binaryName: string, fileName: string, ignoreCase: boolean): boolean
+    assert(t.string(binaryName))
+    assert(t.string(fileName))
+    assert(t.boolean(ignoreCase))
+
+    binaryName = SelfUpdate.pathKey(binaryName, ignoreCase)
+    fileName = SelfUpdate.pathKey(fileName, ignoreCase)
+
+    const oldName = binaryName .. ".old"
+    if fileName == oldName then
+        return true
+    end
+
+    const prefix = oldName .. "."
+    return string.sub(fileName, 1, #prefix) == prefix
+        and string.match(string.sub(fileName, #prefix + 1), "^%d+$") ~= nil
+end
+
+--[[
+    Splits a binary path into its directory prefix (everything up to and including the
+    last "/" or "\", or an empty string for a bare file name) and its file name. Pure.
+]]
+function SelfUpdate.splitBinaryPath(binaryPath: string): (string, string)
+    assert(t.string(binaryPath))
+
+    const prefix = string.match(binaryPath, "^(.*[/\\])") or ""
+    return prefix, string.sub(binaryPath, #prefix + 1)
+end
+
+--[[
+    Lists the leftover .old copies of a binary that sit next to it, in the same form as
+    the given path. Names match without case when ignoreCase is set, as on Windows. Returns
+    nothing if the directory is missing or can't be read.
+]]
+function SelfUpdate.findOldBinaries(binaryPath: string, ignoreCase: boolean): { string }
+    assert(t.string(binaryPath))
+    assert(t.boolean(ignoreCase))
+
+    const prefix, binaryName = SelfUpdate.splitBinaryPath(binaryPath)
+    const dir = if prefix == "" then "." else prefix
+
+    const oldBinaries = {}
+    const ok, entries = pcall(fs.readDir, dir)
+    if not ok then
+        return oldBinaries
+    end
+
+    for _, entry in entries do
+        if SelfUpdate.isOldBinaryName(binaryName, entry, ignoreCase) then
+            table.insert(oldBinaries, prefix .. entry)
+        end
+    end
+    table.sort(oldBinaries)
+
+    return oldBinaries
+end
+
+--[[
+    Parses the permission bits printed by `stat` (e.g., "755" or "4755") into a chmod mode
+    string, or nil when the output isn't an octal mode. Pure.
+]]
+function SelfUpdate.parseFileMode(statOutput: string): string?
+    assert(t.string(statOutput))
+
+    const mode = string.match(statOutput, "^%s*([0-7][0-7][0-7][0-7]?)%s*$")
+    return mode
+end
+
+--[[
+    Returns the chmod argument for a replaced binary. It keeps the original file's mode
+    when known, adding the executable bit wherever the read bit is set so the binary can
+    always run, and otherwise just adds the executable bits. Pure.
+]]
+function SelfUpdate.getChmodMode(originalMode: string?): string
+    assert(t.optional(t.string)(originalMode))
+
+    if originalMode == nil then
+        return "+x"
+    end
+
+    const special = if #originalMode == 4 then string.sub(originalMode, 1, 1) else ""
+    const digits = string.sub(originalMode, -3)
+    const result = { special }
+    for index = 1, 3 do
+        local digit = tonumber(string.sub(digits, index, index)) :: number
+        -- Read without execute (4 or 6) gains execute
+        if bit32.band(digit, 4) ~= 0 then
+            digit = bit32.bor(digit, 1)
+        end
+        table.insert(result, tostring(digit))
+    end
+    return table.concat(result)
+end
+
+--[[
+    Returns the `stat` arguments that print a file's permission bits as octal. macOS and
+    Linux spell the format flag differently. Both follow symlinks (`-L`), since a symlink's
+    own mode is usually 777 and would otherwise leak onto the replacement binary. Pure.
+]]
+function SelfUpdate.getStatArgs(path: string, isMacos: boolean): { string }
+    assert(t.string(path))
+    assert(t.boolean(isMacos))
+
+    if isMacos then
+        return { "-L", "-f", "%Lp", path }
+    end
+    return { "-L", "-c", "%a", path }
+end
+
+--[[
+    Reads a Unix file's permission bits as an octal string, or nil when the file is
+    missing or `stat` fails. Symlinks report the mode of the file they point to.
+]]
+function SelfUpdate.readFileMode(path: string): string?
+    assert(t.string(path))
+
+    if not fs.isFile(path) then
+        return nil
+    end
+
+    const ok, result = pcall(process.exec, "stat", SelfUpdate.getStatArgs(path, process.os == "macos"))
+    if not ok or not result.ok then
+        return nil
+    end
+    return SelfUpdate.parseFileMode(result.stdout)
+end
+
+--[[
+    Replaces a binary file at the given path with new contents. Handles platform-specific
+    locking behavior, and never writes into the existing file (see getReplacementSteps).
 
     On Unix, the running binary is unlinked and replaced directly.
-    On Windows, the running binary is renamed to .old first, then
+    On Windows, the running binary is renamed to a free .old path first, then
     the new binary is written to the original path.
 
     Options:
@@ -44,46 +269,83 @@ function SelfUpdate.replaceBinary(options: {
         newContents = t.string,
     })(options))
 
-    local targetPath = options.targetPath
-    local newContents = options.newContents
+    const targetPath = options.targetPath
+    const newContents = options.newContents
+    -- Read the mode before the old file is removed, so the replacement keeps it
+    const originalMode = if IS_WINDOWS then nil else SelfUpdate.readFileMode(targetPath)
 
-    if IS_WINDOWS then
-        -- Windows locks running executables. Rename the old binary
-        -- first (rename works even on locked files), then write the
-        -- new one to the original path.
-        local oldPath = targetPath .. ".old"
-        if fs.isFile(oldPath) then
-            fs.removeFile(oldPath)
-        end
-        if fs.isFile(targetPath) then
-            -- Use OS rename since fs doesn't have a rename function
-            process.exec("cmd", { "/c", "move", "/Y", targetPath, oldPath })
-        end
-        fs.writeFile(targetPath, newContents)
-    else
-        -- Unix: unlink and replace. The kernel keeps the old inode
-        -- alive for the running process via reference counting.
-        if fs.isFile(targetPath) then
+    const steps = SelfUpdate.getReplacementSteps({
+        IsWindows = IS_WINDOWS,
+        -- Only Windows leaves .old files behind, so Unix skips listing the directory
+        OldExists = IS_WINDOWS and #SelfUpdate.findOldBinaries(targetPath, IS_WINDOWS) > 0,
+        TargetExists = fs.isFile(targetPath),
+    })
+
+    for _, step in steps do
+        if step == "RemoveOld" then
+            SelfUpdate.cleanupOldBinary(targetPath)
+        elseif step == "MoveTargetToOld" then
+            const takenPaths = {}
+            for _, path in SelfUpdate.findOldBinaries(targetPath, IS_WINDOWS) do
+                takenPaths[SelfUpdate.pathKey(path, IS_WINDOWS)] = true
+            end
+            -- A plain rename, which Windows allows even while the binary is running
+            fs.move(targetPath, SelfUpdate.getFreeOldPath(targetPath, takenPaths, IS_WINDOWS))
+        elseif step == "RemoveTarget" then
             fs.removeFile(targetPath)
+        elseif step == "Write" then
+            fs.writeFile(targetPath, newContents)
+        elseif step == "MakeExecutable" then
+            const result = process.exec("chmod", { SelfUpdate.getChmodMode(originalMode), targetPath })
+            if not result.ok then
+                error(`Failed to make "{targetPath}" executable. {result.stderr}`)
+            end
         end
-        fs.writeFile(targetPath, newContents)
-        process.exec("chmod", { "+x", targetPath })
     end
+end
+
+--[[
+    Copies a binary to the given path through replaceBinary, so the destination is never
+    written in place. The source is read in full before anything is replaced, which makes
+    copying a binary onto itself (e.g., the installed binary running its own install
+    command) safe.
+
+    Options:
+    > sourcePath - Path to the binary to copy
+    > targetPath - Path to write the copy to
+]]
+function SelfUpdate.copyBinary(options: {
+    sourcePath: string,
+    targetPath: string,
+})
+    assert(t.interface({
+        sourcePath = t.string,
+        targetPath = t.string,
+    })(options))
+
+    const contents = fs.readFile(options.sourcePath)
+    SelfUpdate.replaceBinary({
+        targetPath = options.targetPath,
+        newContents = contents,
+    })
 end
 
 --[[
     Cleans up any leftover .old files from a previous Windows
     update. Should be called early in the CLI startup path.
-    No-op on Unix systems.
+    Files that are still running stay put until a later cleanup.
+    No-op on Unix systems, which never leave .old files behind.
 ]]
 function SelfUpdate.cleanupOldBinary(binaryPath: string)
     assert(t.string(binaryPath))
 
-    local oldPath = binaryPath .. ".old"
-    if fs.isFile(oldPath) then
-        pcall(function()
-            fs.removeFile(oldPath)
-        end)
+    -- Any .old files next to a Unix binary were put there by the user, not by an update
+    if not IS_WINDOWS then
+        return
+    end
+
+    for _, oldPath in SelfUpdate.findOldBinaries(binaryPath, true) do
+        pcall(fs.removeFile, oldPath)
     end
 end
 
@@ -95,11 +357,11 @@ end
 function SelfUpdate.findExecutable(name: string): string?
     assert(t.string(name))
 
-    local command = if IS_WINDOWS then "where" else "which"
-    local result = process.exec(command, { name })
+    const command = if IS_WINDOWS then "where" else "which"
+    const result = process.exec(command, { name })
 
     if result.ok then
-        local path = result.stdout:match("^%s*(.-)%s*$")
+        const path = result.stdout:match("^%s*(.-)%s*$")
         if path and fs.isFile(path) then
             return path
         end

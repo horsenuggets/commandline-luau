@@ -8,7 +8,7 @@ scripts that enable tab completion.
 
 --]]
 
-local t = require("@packages/t")
+const t = require("@packages/t")
 
 type Command = {
     Name: string,
@@ -25,26 +25,26 @@ type Flag = {
     Shorthand: string?,
 }
 
-local Completions = {}
+const Completions = {}
 
-local function escapeShellString(str: string): string
+const function escapeShellString(str: string): string
     return (string.gsub(str, "'", "'\\''"))
 end
 
-local function escapeFishString(str: string): string
+const function escapeFishString(str: string): string
     return (string.gsub(str, "'", "\\'"))
 end
 
-local function getSubcommandNames(command: Command): { string }
-    local names = {}
+const function getSubcommandNames(command: Command): { string }
+    const names = {}
     for _, sub in command._subcommands do
         table.insert(names, sub.Name)
     end
     return names
 end
 
-local function getFlagCompletions(flags: { Flag }): { string }
-    local completions = {}
+const function getFlagCompletions(flags: { Flag }): { string }
+    const completions = {}
     for _, flag in flags do
         table.insert(completions, "--" .. flag.Name)
     end
@@ -53,14 +53,14 @@ end
 
 -- Helper to emit a line with shell variable interpolation (avoids {{ in backtick
 -- strings which stylua cannot parse)
-local function shellVar(varName: string): string
+const function shellVar(varName: string): string
     return "${" .. varName .. "}"
 end
 
 -- Bash completion generator
 
-local function generateBashSubcommand(lines: { string }, command: Command, path: string, indent: string)
-    local subNames = getSubcommandNames(command)
+const function generateBashSubcommand(lines: { string }, command: Command, path: string, indent: string)
+    const subNames = getSubcommandNames(command)
 
     if #subNames > 0 then
         table.insert(lines, indent .. 'if [[ "' .. shellVar("subcmd_" .. path) .. '" == "" ]]; then')
@@ -69,7 +69,7 @@ local function generateBashSubcommand(lines: { string }, command: Command, path:
         table.insert(lines, indent .. "fi")
 
         for _, sub in command._subcommands do
-            local subPath = path .. "_" .. sub.Name
+            const subPath = path .. "_" .. sub.Name
             table.insert(
                 lines,
                 indent .. 'if [[ "' .. shellVar("subcmd_" .. path) .. '" == "' .. sub.Name .. '" ]]; then'
@@ -96,7 +96,7 @@ local function generateBashSubcommand(lines: { string }, command: Command, path:
                 table.insert(lines, indent .. "    done")
                 generateBashSubcommand(lines, sub, subPath, indent .. "    ")
             else
-                local subFlags = getFlagCompletions(sub._flags)
+                const subFlags = getFlagCompletions(sub._flags)
                 if #subFlags > 0 then
                     table.insert(lines, indent .. '    if [[ "$cur" == -* ]]; then')
                     table.insert(
@@ -117,8 +117,8 @@ end
 function Completions.bash(command: Command): string
     assert(t.table(command))
 
-    local name = command.Name
-    local lines = {}
+    const name = command.Name
+    const lines = {}
 
     table.insert(lines, "_" .. name .. "() {")
     table.insert(lines, "    local cur prev words cword")
@@ -132,7 +132,7 @@ function Completions.bash(command: Command): string
     table.insert(lines, "    fi")
     table.insert(lines, "")
 
-    local flagWords = getFlagCompletions(command._flags)
+    const flagWords = getFlagCompletions(command._flags)
     if #flagWords > 0 then
         table.insert(lines, '    if [[ "$cur" == -* ]]; then')
         table.insert(lines, '        COMPREPLY=($(compgen -W "' .. table.concat(flagWords, " ") .. '" -- "$cur"))')
@@ -163,11 +163,11 @@ end
 
 -- Zsh completion generator
 
-local function zshFlagSpec(flag: Flag): string
-    local desc = escapeShellString(flag.Description)
+const function zshFlagSpec(flag: Flag): string
+    const desc = escapeShellString(flag.Description)
     if flag.Shorthand then
-        local exclusion = "(-" .. flag.Shorthand .. " --" .. flag.Name .. ")"
-        local names = "{-" .. flag.Shorthand .. ",--" .. flag.Name .. "}"
+        const exclusion = "(-" .. flag.Shorthand .. " --" .. flag.Name .. ")"
+        const names = "{-" .. flag.Shorthand .. ",--" .. flag.Name .. "}"
         if flag.Type then
             return "'" .. exclusion .. "'" .. names .. "'[" .. desc .. "]:value:'"
         else
@@ -182,20 +182,20 @@ local function zshFlagSpec(flag: Flag): string
     end
 end
 
-local function generateZshSubcommands(lines: { string }, command: Command, indent: string)
+const function generateZshSubcommands(lines: { string }, command: Command, indent: string)
     if #command._subcommands == 0 then
         return
     end
 
     table.insert(lines, indent .. "local -a commands=(")
     for _, sub in command._subcommands do
-        local desc = escapeShellString(sub.Description)
+        const desc = escapeShellString(sub.Description)
         table.insert(lines, indent .. "    '" .. sub.Name .. ":" .. desc .. "'")
     end
     table.insert(lines, indent .. ")")
     table.insert(lines, "")
 
-    local flagSpecs = {}
+    const flagSpecs = {}
     for _, flag in command._flags do
         table.insert(flagSpecs, zshFlagSpec(flag))
     end
@@ -211,12 +211,12 @@ local function generateZshSubcommands(lines: { string }, command: Command, inden
     table.insert(lines, indent .. "case $state in")
     table.insert(lines, indent .. "    cmd)")
     table.insert(lines, indent .. "        local -a display_cmds cmd_names")
-    local esc = "\\e"
-    local blue = esc .. "[94m"
-    local dim = esc .. "[90m"
-    local reset = esc .. "[0m"
+    const esc = "\\e"
+    const blue = esc .. "[94m"
+    const dim = esc .. "[90m"
+    const reset = esc .. "[0m"
     for _, sub in command._subcommands do
-        local desc = escapeShellString(sub.Description)
+        const desc = escapeShellString(sub.Description)
         table.insert(
             lines,
             indent
@@ -247,11 +247,11 @@ local function generateZshSubcommands(lines: { string }, command: Command, inden
         if #sub._subcommands > 0 then
             generateZshSubcommands(lines, sub, indent .. "                ")
         else
-            local subIndent = indent .. "                "
+            const subIndent = indent .. "                "
             table.insert(lines, subIndent .. "local -a flag_display flag_names")
             for _, flag in sub._flags do
-                local desc = escapeShellString(flag.Description)
-                local nameDisplay = if flag.Shorthand
+                const desc = escapeShellString(flag.Description)
+                const nameDisplay = if flag.Shorthand
                     then "-" .. flag.Shorthand .. ", --" .. flag.Name
                     else "--" .. flag.Name
                 table.insert(
@@ -287,8 +287,8 @@ end
 function Completions.zsh(command: Command): string
     assert(t.table(command))
 
-    local name = command.Name
-    local lines = {}
+    const name = command.Name
+    const lines = {}
 
     table.insert(lines, "#compdef " .. name)
     table.insert(lines, "")
@@ -303,7 +303,7 @@ function Completions.zsh(command: Command): string
     if #command._subcommands > 0 then
         generateZshSubcommands(lines, command, "    ")
     else
-        local flagSpecs = {}
+        const flagSpecs = {}
         for _, flag in command._flags do
             table.insert(flagSpecs, zshFlagSpec(flag))
         end
@@ -324,12 +324,12 @@ end
 
 -- Fish completion generator
 
-local function generateFishSubcommands(lines: { string }, command: Command, parentCondition: string?)
-    local name = command.Name
-    local useSubcommand = parentCondition or "__fish_use_subcommand"
+const function generateFishSubcommands(lines: { string }, command: Command, parentCondition: string?)
+    const name = command.Name
+    const useSubcommand = parentCondition or "__fish_use_subcommand"
 
     for _, sub in command._subcommands do
-        local desc = escapeFishString(sub.Description)
+        const desc = escapeFishString(sub.Description)
         table.insert(
             lines,
             "complete -c " .. name .. ' -n "' .. useSubcommand .. '" -a "' .. sub.Name .. "\" -d '" .. desc .. "'"
@@ -338,8 +338,8 @@ local function generateFishSubcommands(lines: { string }, command: Command, pare
     table.insert(lines, "")
 
     for _, flag in command._flags do
-        local desc = escapeFishString(flag.Description)
-        local parts = { "complete -c " .. name }
+        const desc = escapeFishString(flag.Description)
+        const parts = { "complete -c " .. name }
 
         if parentCondition then
             table.insert(parts, '-n "' .. parentCondition .. '"')
@@ -365,13 +365,13 @@ local function generateFishSubcommands(lines: { string }, command: Command, pare
     end
 
     for _, sub in command._subcommands do
-        local subCondition = "__fish_seen_subcommand_from " .. sub.Name
+        const subCondition = "__fish_seen_subcommand_from " .. sub.Name
         if #sub._subcommands > 0 then
             generateFishSubcommands(lines, sub, subCondition)
         else
             for _, flag in sub._flags do
-                local desc = escapeFishString(flag.Description)
-                local parts = { "complete -c " .. name .. ' -n "' .. subCondition .. '"' }
+                const desc = escapeFishString(flag.Description)
+                const parts = { "complete -c " .. name .. ' -n "' .. subCondition .. '"' }
                 table.insert(parts, "-l " .. flag.Name)
                 if flag.Shorthand then
                     table.insert(parts, "-s " .. flag.Shorthand)
@@ -392,8 +392,8 @@ end
 function Completions.fish(command: Command): string
     assert(t.table(command))
 
-    local name = command.Name
-    local lines = {}
+    const name = command.Name
+    const lines = {}
 
     table.insert(lines, "# Completions for " .. name)
     table.insert(lines, "complete -c " .. name .. " -f")
@@ -403,8 +403,8 @@ function Completions.fish(command: Command): string
         generateFishSubcommands(lines, command, nil)
     else
         for _, flag in command._flags do
-            local desc = escapeFishString(flag.Description)
-            local parts = { "complete -c " .. name }
+            const desc = escapeFishString(flag.Description)
+            const parts = { "complete -c " .. name }
             table.insert(parts, "-l " .. flag.Name)
             if flag.Shorthand then
                 table.insert(parts, "-s " .. flag.Shorthand)
@@ -423,17 +423,17 @@ end
 
 -- PowerShell completion generator
 
-local function escapePowerShellString(str: string): string
+const function escapePowerShellString(str: string): string
     return (string.gsub(str, "'", "''"))
 end
 
 function Completions.powershell(command: Command): string
     assert(t.table(command))
 
-    local name = command.Name
-    local lines = {}
-    local filter = [[| Where-Object { $_.CompletionText -like "$wordToComplete*" }]]
-    local cr = "[System.Management.Automation.CompletionResult]"
+    const name = command.Name
+    const lines = {}
+    const filter = [[| Where-Object { $_.CompletionText -like "$wordToComplete*" }]]
+    const cr = "[System.Management.Automation.CompletionResult]"
 
     table.insert(lines, "# Completions for " .. name)
     table.insert(lines, "Register-ArgumentCompleter -CommandName " .. name .. " -ScriptBlock {")
@@ -449,7 +449,7 @@ function Completions.powershell(command: Command): string
 
     if #command._subcommands > 0 then
         -- Build subcommand list for validation
-        local subNames = {}
+        const subNames = {}
         for _, sub in command._subcommands do
             table.insert(subNames, "'" .. sub.Name .. "'")
         end
@@ -462,7 +462,7 @@ function Completions.powershell(command: Command): string
         table.insert(lines, "        if ($wordToComplete -like '-*') {")
         table.insert(lines, "            @(")
         for _, flag in command._flags do
-            local desc = escapePowerShellString(flag.Description)
+            const desc = escapePowerShellString(flag.Description)
             table.insert(
                 lines,
                 "                "
@@ -480,7 +480,7 @@ function Completions.powershell(command: Command): string
         table.insert(lines, "        } else {")
         table.insert(lines, "            @(")
         for _, sub in command._subcommands do
-            local desc = escapePowerShellString(sub.Description)
+            const desc = escapePowerShellString(sub.Description)
             table.insert(
                 lines,
                 "                "
@@ -504,7 +504,7 @@ function Completions.powershell(command: Command): string
             table.insert(lines, "            '" .. sub.Name .. "' {")
             table.insert(lines, "                @(")
             for _, flag in sub._flags do
-                local desc = escapePowerShellString(flag.Description)
+                const desc = escapePowerShellString(flag.Description)
                 table.insert(
                     lines,
                     "                    "
@@ -526,7 +526,7 @@ function Completions.powershell(command: Command): string
     else
         table.insert(lines, "    @(")
         for _, flag in command._flags do
-            local desc = escapePowerShellString(flag.Description)
+            const desc = escapePowerShellString(flag.Description)
             table.insert(
                 lines,
                 "        "

@@ -6,12 +6,12 @@ Tests for the Arg class, covering creation, type validation, and default value h
 
 --]]
 
-local Arg = require("../Source/Commandline/Arg")
+const Arg = require("../Source/Commandline/Arg")
 
 return function()
     describe("Arg.new", function()
         it("should create a basic Arg with default values", function()
-            local arg = Arg.new({ Name = "testarg" })
+            const arg = Arg.new({ Name = "testarg" })
             expect(arg).to.be.ok()
             expect(arg.Name).to.equal("testarg")
             expect(arg.Description).to.equal("No description.")
@@ -21,7 +21,7 @@ return function()
         end)
 
         it("should create an Arg with custom description", function()
-            local arg = Arg.new({
+            const arg = Arg.new({
                 Name = "testarg",
                 Description = "A test argument",
             })
@@ -29,21 +29,21 @@ return function()
         end)
 
         it("should create an Arg with different types", function()
-            local boolArg = Arg.new({ Name = "flag", Type = "boolean" })
+            const boolArg = Arg.new({ Name = "flag", Type = "boolean" })
             expect(boolArg.Type).to.equal("boolean")
 
-            local intArg = Arg.new({ Name = "count", Type = "int" })
+            const intArg = Arg.new({ Name = "count", Type = "int" })
             expect(intArg.Type).to.equal("int")
 
-            local numArg = Arg.new({ Name = "value", Type = "number" })
+            const numArg = Arg.new({ Name = "value", Type = "number" })
             expect(numArg.Type).to.equal("number")
 
-            local strArg = Arg.new({ Name = "text", Type = "string" })
+            const strArg = Arg.new({ Name = "text", Type = "string" })
             expect(strArg.Type).to.equal("string")
         end)
 
         it("should create an optional Arg when Required is false", function()
-            local arg = Arg.new({
+            const arg = Arg.new({
                 Name = "optional",
                 Required = false,
             })
@@ -51,7 +51,7 @@ return function()
         end)
 
         it("should create an Arg with default value and make it optional", function()
-            local arg = Arg.new({
+            const arg = Arg.new({
                 Name = "count",
                 Type = "int",
                 Required = false,
@@ -92,7 +92,7 @@ return function()
         end)
 
         it("should validate int type default value", function()
-            local arg = Arg.new({
+            const arg = Arg.new({
                 Name = "count",
                 Type = "int",
                 Required = false,
@@ -111,7 +111,7 @@ return function()
         end)
 
         it("should validate boolean type default value", function()
-            local arg = Arg.new({
+            const arg = Arg.new({
                 Name = "flag",
                 Type = "boolean",
                 Required = false,
@@ -130,7 +130,7 @@ return function()
         end)
 
         it("should validate number type default value", function()
-            local arg = Arg.new({
+            const arg = Arg.new({
                 Name = "value",
                 Type = "number",
                 Required = false,
@@ -149,7 +149,7 @@ return function()
         end)
 
         it("should validate string type default value", function()
-            local arg = Arg.new({
+            const arg = Arg.new({
                 Name = "text",
                 Type = "string",
                 Required = false,
@@ -169,11 +169,11 @@ return function()
 
         it("should throw error for invalid Arg options", function()
             expect(function()
-                Arg.new({ InvalidField = "test" })
+                Arg.new({ InvalidField = "test" } :: any)
             end).to.throw()
 
             expect(function()
-                Arg.new("not a table")
+                Arg.new("not a table" :: any)
             end).to.throw()
         end)
 
@@ -181,7 +181,7 @@ return function()
             expect(function()
                 Arg.new({
                     Description = "Missing name",
-                })
+                } :: any)
             end).to.throw()
         end)
     end)

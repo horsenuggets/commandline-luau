@@ -9,12 +9,12 @@ but not both.
 
 --]]
 
-local Arg = require("./Arg")
-local Chalk = require("@packages/Chalk")
-local Flag = require("./Flag")
-local StringUtils = require("./Helpers/StringUtils")
-local TypeUtils = require("./Helpers/TypeUtils")
-local t = require("@packages/t")
+const Arg = require("./Arg")
+const Chalk = require("@packages/Chalk")
+const Flag = require("./Flag")
+const StringUtils = require("./Helpers/StringUtils")
+const TypeUtils = require("./Helpers/TypeUtils")
+const t = require("@packages/t")
 
 export type Command = {
     -- Constructor
@@ -67,7 +67,7 @@ export type CommandlineOptions = {
     Impl: ((args: { [string]: any }, flags: { [string]: { Value: any? } }) -> any)?,
 }
 
-local ICommandlineOptions = t.strictInterface({
+const ICommandlineOptions = t.strictInterface({
     Name = t.string,
     Description = t.optional(t.string),
     Version = t.optional(t.string),
@@ -76,15 +76,15 @@ local ICommandlineOptions = t.strictInterface({
     Subcommands = t.optional(t.array(t.any)),
     Impl = t.optional(t.callback),
 })
-local ITokens = t.array(t.string)
+const ITokens = t.array(t.string)
 
-local Command = {}
+const Command = {}
 Command.__index = Command
 
 function Command.new(commandlineOptions: CommandlineOptions): Command
     assert(ICommandlineOptions(commandlineOptions), "Invalid commandline options provided.")
 
-    local self = setmetatable({}, Command)
+    const self = setmetatable({}, Command)
     self.Name = commandlineOptions.Name:lower()
     self.Description = commandlineOptions.Description or "No description."
     self.Version = commandlineOptions.Version
@@ -153,7 +153,7 @@ function Command.new(commandlineOptions: CommandlineOptions): Command
     end
 
     -- Validate uniqueness of Arg names
-    local argNames = {}
+    const argNames = {}
     for _, arg in self._args do
         StringUtils.assertAlphanumericLowercase(arg.Name, "Arg name")
         assert(not argNames[arg.Name], `Duplicate Arg name "{arg.Name}".`)
@@ -161,8 +161,8 @@ function Command.new(commandlineOptions: CommandlineOptions): Command
     end
 
     -- Validate uniqueness of flag names and shorthands
-    local flagNames = {}
-    local flagShorthands = {}
+    const flagNames = {}
+    const flagShorthands = {}
     for _, flag in self._flags do
         StringUtils.assertAlphanumericLowercase(flag.Name, "Flag name")
         assert(not flagNames[flag.Name], `Duplicate Flag name "{flag.Name}".`)
@@ -175,7 +175,7 @@ function Command.new(commandlineOptions: CommandlineOptions): Command
     end
 
     -- Validate uniqueness of subcommand names and set command paths
-    local subcommandNames = {}
+    const subcommandNames = {}
     for _, subcommand in self._subcommands do
         assert(not subcommandNames[subcommand.Name], `Duplicate subcommand name "{subcommand.Name}".`)
         subcommandNames[subcommand.Name] = true
@@ -220,7 +220,7 @@ end
 
 function Command._makeHelpMessage(self: Command): string
     -- Build the usage line with Flags and Args
-    local usageParts = { Chalk.blueBright(self._commandPath) }
+    const usageParts = { Chalk.blueBright(self._commandPath) }
 
     -- If subcommands are present, show <subcommand> instead of Args
     if #self._subcommands > 0 then
@@ -241,9 +241,9 @@ function Command._makeHelpMessage(self: Command): string
         end
     end
 
-    local usageLine = `{Chalk.gray(`> {table.concat(usageParts, " ")}`)}`
+    const usageLine = `{Chalk.gray(`> {table.concat(usageParts, " ")}`)}`
 
-    local messageParts = {
+    const messageParts = {
         ``,
         `{Chalk.bold(self._commandPath)}{if self.Version
             then ` {Chalk.gray(`[{Chalk.greenBright(self.Version)}]`)}`
@@ -260,11 +260,11 @@ function Command._makeHelpMessage(self: Command): string
         table.insert(messageParts, `{Chalk.gray(`[{Chalk.yellow(`Flags`)}]`)}`)
 
         -- Sort flags alphabetically, keeping help and version last
-        local AUTO_FLAGS = { help = true, version = true }
-        local sortedFlags = table.clone(self._flags)
+        const AUTO_FLAGS = { help = true, version = true }
+        const sortedFlags = table.clone(self._flags)
         table.sort(sortedFlags, function(a, b)
-            local aIsAuto = AUTO_FLAGS[a.Name] or false
-            local bIsAuto = AUTO_FLAGS[b.Name] or false
+            const aIsAuto = AUTO_FLAGS[a.Name] or false
+            const bIsAuto = AUTO_FLAGS[b.Name] or false
             if aIsAuto ~= bIsAuto then
                 return not aIsAuto
             end
@@ -272,7 +272,7 @@ function Command._makeHelpMessage(self: Command): string
         end)
 
         for _, flag in sortedFlags do
-            local flagParts = {}
+            const flagParts = {}
 
             -- Add shorthand if available
             if flag.Shorthand then
@@ -283,7 +283,7 @@ function Command._makeHelpMessage(self: Command): string
             table.insert(flagParts, Chalk.blueBright(`--{flag.Name}`))
 
             -- Build the Flag line
-            local flagLine =
+            const flagLine =
                 `{Chalk.gray(`> `)}{table.concat(flagParts, Chalk.gray(", "))} {Chalk.gray("--")} {Chalk.italic(
                     Chalk.gray(flag.Description)
                 )}`
@@ -295,12 +295,12 @@ function Command._makeHelpMessage(self: Command): string
     if #self._subcommands > 0 then
         table.insert(messageParts, ``)
         table.insert(messageParts, `{Chalk.gray(`[{Chalk.yellow(`Subcommands`)}]`)}`)
-        local sortedSubcommands = table.clone(self._subcommands)
+        const sortedSubcommands = table.clone(self._subcommands)
         table.sort(sortedSubcommands, function(a, b)
             return a.Name < b.Name
         end)
         for _, subcommand in sortedSubcommands do
-            local subcommandLine =
+            const subcommandLine =
                 `{Chalk.gray(`> `)}{Chalk.blueBright(subcommand.Name)} {Chalk.gray("--")} {Chalk.italic(
                     Chalk.gray(subcommand.Description)
                 )}`
@@ -361,7 +361,7 @@ function Command._parseFlag(
             return nil, `Invalid shorthand Flag format {Chalk.bold(token)}.`
         end
 
-        local shorthand = token:sub(2, 2)
+        const shorthand = token:sub(2, 2)
         flagDef = self:_findFlagByShorthand(shorthand)
 
         if not flagDef then
@@ -372,7 +372,7 @@ function Command._parseFlag(
             return nil, `Invalid shorthand Flag format {Chalk.bold(token)}.`
         end
 
-        local flagName = token:sub(3)
+        const flagName = token:sub(3)
         flagDef = self:_findFlagByName(flagName)
 
         if not flagDef then
@@ -389,15 +389,15 @@ function Command._parseFlag(
     -- If the Flag has a type, it needs a value
     index += 1
     if index > #tokens then
-        local flagDisplay = isShorthand and `-{token:sub(2, 2)}` or `--{flagDef.Name}`
+        const flagDisplay = isShorthand and `-{token:sub(2, 2)}` or `--{flagDef.Name}`
         return nil, `Flag {Chalk.bold(flagDisplay)} requires a value.`
     end
-    local flagValueToken = tokens[index]
+    const flagValueToken = tokens[index]
 
     -- Cast the Flag value to the correct type
-    local flagValue, castErr = TypeUtils.castFromString(flagValueToken, flagDef.Type)
+    const flagValue, castErr = TypeUtils.castFromString(flagValueToken, flagDef.Type)
     if castErr then
-        local flagDisplay = isShorthand and `-{token:sub(2, 2)}` or `--{flagDef.Name}`
+        const flagDisplay = isShorthand and `-{token:sub(2, 2)}` or `--{flagDef.Name}`
         return nil, `Flag {Chalk.bold(flagDisplay)} - {castErr}`
     end
 
@@ -406,7 +406,7 @@ function Command._parseFlag(
 end
 
 function Command._initializeFlagDefaults(self: Command): { [string]: { Value: any? } }
-    local parsedFlags = {}
+    const parsedFlags = {}
     for _, flag in self._flags do
         parsedFlags[flag.Name] = { Value = flag.Default }
     end
@@ -414,7 +414,7 @@ function Command._initializeFlagDefaults(self: Command): { [string]: { Value: an
 end
 
 function Command._parsePositionalArgs(self: Command, positionalArgs: { string }): ({ [string]: any }?, string?)
-    local parsedArgs = {}
+    const parsedArgs = {}
 
     -- Count required Args
     local requiredArgCount = 0
@@ -437,7 +437,7 @@ function Command._parsePositionalArgs(self: Command, positionalArgs: { string })
     for argIndex, argDef in self._args do
         if argIndex <= #positionalArgs then
             -- Cast the Arg value to the correct type
-            local argValue, castErr = TypeUtils.castFromString(positionalArgs[argIndex], argDef.Type)
+            const argValue, castErr = TypeUtils.castFromString(positionalArgs[argIndex], argDef.Type)
             if castErr then
                 return nil, `Arg {Chalk.bold(argDef.Name)} - {castErr}`
             end
@@ -454,21 +454,21 @@ function Command._parseArgsAndFlags(
     self: Command,
     tokens: { string }
 ): ({ string }, { [string]: { Value: any? } }, string?)
-    local parsedFlags = self:_initializeFlagDefaults()
-    local positionalArgs = {}
+    const parsedFlags = self:_initializeFlagDefaults()
+    const positionalArgs = {}
 
     local i = 1
     while i <= #tokens do
-        local token = tokens[i]
+        const token = tokens[i]
 
         if token:sub(1, 2) == "--" then
-            local newIndex, err = self:_parseFlag(token, tokens, i, parsedFlags, false)
+            const newIndex, err = self:_parseFlag(token, tokens, i, parsedFlags, false)
             if not newIndex then
                 return positionalArgs, parsedFlags, err
             end
             i = newIndex
         elseif token:sub(1, 1) == "-" and #token > 1 then
-            local newIndex, err = self:_parseFlag(token, tokens, i, parsedFlags, true)
+            const newIndex, err = self:_parseFlag(token, tokens, i, parsedFlags, true)
             if not newIndex then
                 return positionalArgs, parsedFlags, err
             end
@@ -489,7 +489,7 @@ function Command.Execute(self: Command, tokens: { string }): any
     -- Check if we have subcommands and if the first token matches a
     -- subcommand
     if #self._subcommands > 0 and #tokens > 0 then
-        local potentialSubcommandName = tokens[1]
+        const potentialSubcommandName = tokens[1]
 
         -- Find matching subcommand
         local matchedSubcommand = nil
@@ -502,7 +502,7 @@ function Command.Execute(self: Command, tokens: { string }): any
 
         -- If we found a matching subcommand, execute it with remaining tokens
         if matchedSubcommand then
-            local remainingTokens = {}
+            const remainingTokens = {}
             for i = 2, #tokens do
                 table.insert(remainingTokens, tokens[i])
             end
