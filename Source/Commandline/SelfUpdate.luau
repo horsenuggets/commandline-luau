@@ -179,6 +179,62 @@ function SelfUpdate.findOldBinaries(binaryPath: string, ignoreCase: boolean): { 
 end
 
 --[[
+    Parses the permission bits printed by `stat` (e.g., "755" or "4755") into a chmod mode
+    string, or nil when the output isn't an octal mode. Pure.
+]]
+function SelfUpdate.parseFileMode(statOutput: string): string?
+    assert(t.string(statOutput))
+
+    const mode = string.match(statOutput, "^%s*([0-7][0-7][0-7][0-7]?)%s*$")
+    return mode
+end
+
+--[[
+    Returns the chmod argument for a replaced binary. It keeps the original file's mode
+    when known, adding the executable bit wherever the read bit is set so the binary can
+    always run, and otherwise just adds the executable bits. Pure.
+]]
+function SelfUpdate.getChmodMode(originalMode: string?): string
+    assert(t.optional(t.string)(originalMode))
+
+    if originalMode == nil then
+        return "+x"
+    end
+
+    const special = if #originalMode == 4 then string.sub(originalMode, 1, 1) else ""
+    const digits = string.sub(originalMode, -3)
+    const result = { special }
+    for index = 1, 3 do
+        local digit = tonumber(string.sub(digits, index, index)) :: number
+        -- Read without execute (4 or 6) gains execute
+        if bit32.band(digit, 4) ~= 0 then
+            digit = bit32.bor(digit, 1)
+        end
+        table.insert(result, tostring(digit))
+    end
+    return table.concat(result)
+end
+
+--[[
+    Reads a Unix file's permission bits as an octal string, or nil when the file is
+    missing or `stat` fails. macOS and Linux spell the `stat` format flag differently.
+]]
+function SelfUpdate.readFileMode(path: string): string?
+    assert(t.string(path))
+
+    if not fs.isFile(path) then
+        return nil
+    end
+
+    const args = if process.os == "macos" then { "-f", "%Lp", path } else { "-c", "%a", path }
+    const ok, result = pcall(process.exec, "stat", args)
+    if not ok or not result.ok then
+        return nil
+    end
+    return SelfUpdate.parseFileMode(result.stdout)
+end
+
+--[[
     Replaces a binary file at the given path with new contents. Handles platform-specific
     locking behavior, and never writes into the existing file (see getReplacementSteps).
 
@@ -201,6 +257,8 @@ function SelfUpdate.replaceBinary(options: {
 
     const targetPath = options.targetPath
     const newContents = options.newContents
+    -- Read the mode before the old file is removed, so the replacement keeps it
+    const originalMode = if IS_WINDOWS then nil else SelfUpdate.readFileMode(targetPath)
 
     const steps = SelfUpdate.getReplacementSteps({
         IsWindows = IS_WINDOWS,
@@ -224,7 +282,7 @@ function SelfUpdate.replaceBinary(options: {
         elseif step == "Write" then
             fs.writeFile(targetPath, newContents)
         elseif step == "MakeExecutable" then
-            const result = process.exec("chmod", { "+x", targetPath })
+            const result = process.exec("chmod", { SelfUpdate.getChmodMode(originalMode), targetPath })
             if not result.ok then
                 error(`Failed to make "{targetPath}" executable. {result.stderr}`)
             end
@@ -267,7 +325,12 @@ end
 function SelfUpdate.cleanupOldBinary(binaryPath: string)
     assert(t.string(binaryPath))
 
-    for _, oldPath in SelfUpdate.findOldBinaries(binaryPath, IS_WINDOWS) do
+    -- Any .old files next to a Unix binary were put there by the user, not by an update
+    if not IS_WINDOWS then
+        return
+    end
+
+    for _, oldPath in SelfUpdate.findOldBinaries(binaryPath, true) do
         pcall(fs.removeFile, oldPath)
     end
 end

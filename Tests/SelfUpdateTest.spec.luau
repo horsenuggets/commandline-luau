@@ -282,6 +282,68 @@ return function()
         end)
     end)
 
+    describe("parseFileMode", function()
+        it("should accept three and four digit octal modes with surrounding whitespace", function()
+            expect(SelfUpdate.parseFileMode("755\n")).to.equal("755")
+            expect(SelfUpdate.parseFileMode("  700 ")).to.equal("700")
+            expect(SelfUpdate.parseFileMode("4755\n")).to.equal("4755")
+        end)
+
+        it("should reject anything that isn't an octal mode", function()
+            for _, output in { "", "rwxr-xr-x", "789", "75", "75555", "stat: cannot stat" } do
+                expect(SelfUpdate.parseFileMode(output)).to.equal(nil)
+            end
+        end)
+    end)
+
+    describe("getChmodMode", function()
+        it("should keep a known mode, adding execute wherever read is set", function()
+            const cases = {
+                { "700", "700" },
+                { "750", "750" },
+                { "755", "755" },
+                { "644", "755" },
+                { "600", "700" },
+                { "640", "750" },
+                { "4755", "4755" },
+                { "4644", "4755" },
+                { "000", "000" },
+            }
+            for _, case in cases do
+                expect(SelfUpdate.getChmodMode(case[1])).to.equal(case[2])
+            end
+        end)
+
+        it("should just add the executable bits when the mode is unknown", function()
+            expect(SelfUpdate.getChmodMode(nil)).to.equal("+x")
+        end)
+    end)
+
+    if not IS_WINDOWS then
+        describe("replaceBinary permissions", function()
+            it("should keep the original file's mode", function()
+                const dir = createTempDir()
+                const targetPath = dir .. "/tool"
+                fs.writeFile(targetPath, "old binary")
+                for _, case in { { "700", "700" }, { "750", "750" }, { "755", "755" }, { "640", "750" } } do
+                    expect(process.exec("chmod", { case[1], targetPath }).ok).to.equal(true)
+                    SelfUpdate.replaceBinary({ targetPath = targetPath, newContents = "new binary" })
+                    expect(SelfUpdate.readFileMode(targetPath)).to.equal(case[2])
+                end
+                expect(fs.readFile(targetPath)).to.equal("new binary")
+                removeTempDir(dir)
+            end)
+
+            it("should make a brand new binary executable", function()
+                const dir = createTempDir()
+                const targetPath = dir .. "/tool"
+                SelfUpdate.replaceBinary({ targetPath = targetPath, newContents = "new binary" })
+                expect(process.exec("test", { "-x", targetPath }).ok).to.equal(true)
+                removeTempDir(dir)
+            end)
+        end)
+    end
+
     describe("pathKey", function()
         it("should lowercase only when ignoring case", function()
             expect(SelfUpdate.pathKey("C:/Bin/Tool.EXE.old", true)).to.equal("c:/bin/tool.exe.old")
@@ -442,30 +504,33 @@ return function()
     end)
 
     describe("cleanupOldBinary", function()
-        it("should remove numbered .old files too", function()
-            const dir = createTempDir()
-            const binaryPath = dir .. "/tool"
+        if IS_WINDOWS then
+            it("should remove .old and numbered .old files", function()
+                const dir = createTempDir()
+                const binaryPath = dir .. "/tool"
 
-            fs.writeFile(binaryPath .. ".old", "stale binary")
-            fs.writeFile(binaryPath .. ".old.1", "stale binary")
-            SelfUpdate.cleanupOldBinary(binaryPath)
+                fs.writeFile(binaryPath .. ".old", "stale binary")
+                fs.writeFile(binaryPath .. ".old.1", "stale binary")
+                SelfUpdate.cleanupOldBinary(binaryPath)
 
-            expect(fs.isFile(binaryPath .. ".old")).to.equal(false)
-            expect(fs.isFile(binaryPath .. ".old.1")).to.equal(false)
-            removeTempDir(dir)
-        end)
+                expect(fs.isFile(binaryPath .. ".old")).to.equal(false)
+                expect(fs.isFile(binaryPath .. ".old.1")).to.equal(false)
+                removeTempDir(dir)
+            end)
+        else
+            it("should leave .old files alone, since updates never create them on Unix", function()
+                const dir = createTempDir()
+                const binaryPath = dir .. "/tool"
 
-        it("should remove .old file if it exists", function()
-            const dir = createTempDir()
-            const binaryPath = dir .. "/tool"
-            const oldPath = binaryPath .. ".old"
+                fs.writeFile(binaryPath .. ".old", "the user's file")
+                fs.writeFile(binaryPath .. ".old.1", "the user's file")
+                SelfUpdate.cleanupOldBinary(binaryPath)
 
-            fs.writeFile(oldPath, "stale binary")
-            SelfUpdate.cleanupOldBinary(binaryPath)
-
-            expect(fs.isFile(oldPath)).to.equal(false)
-            removeTempDir(dir)
-        end)
+                expect(fs.readFile(binaryPath .. ".old")).to.equal("the user's file")
+                expect(fs.readFile(binaryPath .. ".old.1")).to.equal("the user's file")
+                removeTempDir(dir)
+            end)
+        end
 
         it("should do nothing if no .old file exists", function()
             const dir = createTempDir()
