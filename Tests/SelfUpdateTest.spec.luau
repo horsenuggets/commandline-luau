@@ -296,6 +296,23 @@ return function()
         end)
     end)
 
+    describe("getStatArgs", function()
+        it("should follow symlinks and print octal permissions on each platform", function()
+            expect(table.concat(SelfUpdate.getStatArgs("/bin/tool", true), " ")).to.equal("-L -f %Lp /bin/tool")
+            expect(table.concat(SelfUpdate.getStatArgs("/bin/tool", false), " ")).to.equal("-L -c %a /bin/tool")
+        end)
+
+        it("should validate arguments", function()
+            expect(function()
+                SelfUpdate.getStatArgs(1 :: any, true)
+            end).to.throw()
+
+            expect(function()
+                SelfUpdate.getStatArgs("/bin/tool", nil :: any)
+            end).to.throw()
+        end)
+    end)
+
     describe("getChmodMode", function()
         it("should keep a known mode, adding execute wherever read is set", function()
             const cases = {
@@ -331,6 +348,19 @@ return function()
                     expect(SelfUpdate.readFileMode(targetPath)).to.equal(case[2])
                 end
                 expect(fs.readFile(targetPath)).to.equal("new binary")
+                removeTempDir(dir)
+            end)
+
+            it("should take the mode from a symlink's target, not the link itself", function()
+                const dir = createTempDir()
+                const realPath = dir .. "/real-tool"
+                const linkPath = dir .. "/tool"
+                fs.writeFile(realPath, "old binary")
+                expect(process.exec("chmod", { "700", realPath }).ok).to.equal(true)
+                expect(process.exec("ln", { "-s", realPath, linkPath }).ok).to.equal(true)
+                expect(SelfUpdate.readFileMode(linkPath)).to.equal("700")
+                SelfUpdate.replaceBinary({ targetPath = linkPath, newContents = "new binary" })
+                expect(SelfUpdate.readFileMode(linkPath)).to.equal("700")
                 removeTempDir(dir)
             end)
 
