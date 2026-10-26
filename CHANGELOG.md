@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.4
+- Fix the install command overwriting the installed binary in place, which got running copies killed on macOS
+- Add SelfUpdate.copyBinary and SelfUpdate.getReplacementSteps so every binary write replaces the file instead of overwriting it
+- Fix Windows replacements failing when a previous .old binary is still running by moving the binary aside to a numbered .old path
+
 ## 0.2.3
 - Remove .luaurc from Wally package to fix @packages alias resolution in downstream projects
 
