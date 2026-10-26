@@ -216,8 +216,23 @@ function SelfUpdate.getChmodMode(originalMode: string?): string
 end
 
 --[[
+    Returns the `stat` arguments that print a file's permission bits as octal. macOS and
+    Linux spell the format flag differently. Both follow symlinks (`-L`), since a symlink's
+    own mode is usually 777 and would otherwise leak onto the replacement binary. Pure.
+]]
+function SelfUpdate.getStatArgs(path: string, isMacos: boolean): { string }
+    assert(t.string(path))
+    assert(t.boolean(isMacos))
+
+    if isMacos then
+        return { "-L", "-f", "%Lp", path }
+    end
+    return { "-L", "-c", "%a", path }
+end
+
+--[[
     Reads a Unix file's permission bits as an octal string, or nil when the file is
-    missing or `stat` fails. macOS and Linux spell the `stat` format flag differently.
+    missing or `stat` fails. Symlinks report the mode of the file they point to.
 ]]
 function SelfUpdate.readFileMode(path: string): string?
     assert(t.string(path))
@@ -226,8 +241,7 @@ function SelfUpdate.readFileMode(path: string): string?
         return nil
     end
 
-    const args = if process.os == "macos" then { "-f", "%Lp", path } else { "-c", "%a", path }
-    const ok, result = pcall(process.exec, "stat", args)
+    const ok, result = pcall(process.exec, "stat", SelfUpdate.getStatArgs(path, process.os == "macos"))
     if not ok or not result.ok then
         return nil
     end
