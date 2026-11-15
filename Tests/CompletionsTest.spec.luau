@@ -78,23 +78,9 @@ return function()
                 Subcommands = { makeCommandWithSubcommands() },
             })
             const fish = Completions.fish(cmd)
-            expect(
-                string.find(
-                    fish,
-                    'complete -c outer -n "__fish_seen_subcommand_from mytool; and not __fish_seen_subcommand_from build run init" -a "build"',
-                    1,
-                    true
-                )
-            ).to.be.ok()
+            expect(string.find(fish, 'complete -c outer -n "__outer_at_command exact mytool" -a "build"', 1, true)).to.be.ok()
             expect(string.find(fish, "complete -c mytool", 1, true)).to.equal(nil)
-            expect(
-                string.find(
-                    fish,
-                    "__fish_seen_subcommand_from mytool; and __fish_seen_subcommand_from build; and __outer_no_matches",
-                    1,
-                    true
-                )
-            ).to.be.ok()
+            expect(string.find(fish, "__outer_at_command prefix mytool build; and __outer_no_matches", 1, true)).to.be.ok()
             const zsh = Completions.zsh(cmd)
             expect(string.find(zsh, "[Target platform.]:value:", 1, true)).to.be.ok()
             expect(string.find(zsh, "        _files", 1, true)).to.be.ok()
@@ -232,6 +218,26 @@ return function()
     end)
 
     describe("fish", function()
+        it("should distinguish repeated command names by their ordered positions", function()
+            const leaf = makeSimpleCommand()
+            leaf.Name = "build"
+            const cmd = Command.new({
+                Name = "outer",
+                Description = "Test tool.",
+                Subcommands = {
+                    Command.new({ Name = "build", Description = "Build group.", Subcommands = { leaf } }),
+                },
+            })
+            const output = Completions.fish(cmd)
+            expect(string.find(output, '-n "__outer_at_command exact build" -a "build"', 1, true)).to.be.ok()
+            expect(
+                string.find(output, '-n "__outer_at_command prefix build build; and __outer_no_matches" -r -F', 1, true)
+            ).to.be.ok()
+            expect(string.find(output, 'test "$words[1]" = "$expected"; or return 1', 1, true)).to.be.ok()
+            expect(string.find(output, 'test "$mode" = prefix; or test (count $words) -eq 0', 1, true)).to.be.ok()
+            expect(string.find(output, "__fish_seen_subcommand_from", 1, true)).to.equal(nil)
+        end)
+
         it("should scope repeated leaf names to their ancestor branches", function()
             const branches = {}
             for _, name in { "a", "b" } do
@@ -260,17 +266,10 @@ return function()
             const cmd = Command.new({ Name = "outer", Description = "Test tool.", Subcommands = branches })
             const output = Completions.fish(cmd)
             for _, name in { "a", "b" } do
-                const condition = `__fish_seen_subcommand_from {name}; and __fish_seen_subcommand_from build`
+                const condition = `__outer_at_command prefix {name} build`
                 expect(string.find(output, `-l {name}-output -d 'Output file.' -n "{condition}" -x`, 1, true)).to.be.ok()
                 expect(string.find(output, `-n "{condition}; and __outer_no_matches" -r -F`, 1, true)).to.be.ok()
-                expect(
-                    string.find(
-                        output,
-                        `-n "__fish_seen_subcommand_from {name}; and not __fish_seen_subcommand_from build" -a "build"`,
-                        1,
-                        true
-                    )
-                ).to.be.ok()
+                expect(string.find(output, `-n "__outer_at_command exact {name}" -a "build"`, 1, true)).to.be.ok()
             end
         end)
 
@@ -328,20 +327,18 @@ return function()
 
         it("should retain subcommand conditions on typed option fallbacks", function()
             const output = Completions.fish(makeCommandWithSubcommands())
-            expect(
-                string.find(output, '-n "__fish_seen_subcommand_from build; and __mytool_no_matches" -r -F', 1, true)
-            ).to.be.ok()
-            expect(string.find(output, '-n "__fish_seen_subcommand_from run; and __mytool_no_matches" -r -F', 1, true)).to.be.ok()
+            expect(string.find(output, '-n "__mytool_at_command prefix build; and __mytool_no_matches" -r -F', 1, true)).to.be.ok()
+            expect(string.find(output, '-n "__mytool_at_command prefix run; and __mytool_no_matches" -r -F', 1, true)).to.be.ok()
         end)
 
         it("should include subcommand completions with conditions", function()
             const cmd = makeCommandWithSubcommands()
             const output = Completions.fish(cmd)
-            expect(string.find(output, "__fish_use_subcommand")).to.be.ok()
+            expect(string.find(output, "__mytool_at_command exact")).to.be.ok()
             expect(string.find(output, '%-a "build"')).to.be.ok()
             expect(string.find(output, '%-a "run"')).to.be.ok()
-            expect(string.find(output, "__fish_seen_subcommand_from build")).to.be.ok()
-            expect(string.find(output, "__fish_seen_subcommand_from run")).to.be.ok()
+            expect(string.find(output, "__mytool_at_command prefix build")).to.be.ok()
+            expect(string.find(output, "__mytool_at_command prefix run")).to.be.ok()
         end)
     end)
 

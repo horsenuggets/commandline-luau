@@ -332,13 +332,10 @@ const function generateFishFlag(lines: { string }, name: string, flag: Flag, con
     table.insert(lines, table.concat(parts, " "))
 end
 
-const function generateFishSubcommands(lines: { string }, command: Command, name: string, parentCondition: string?)
-    const useSubcommand = if parentCondition
-        then parentCondition .. "; and not __fish_seen_subcommand_from " .. table.concat(
-            getSubcommandNames(command),
-            " "
-        )
-        else "__fish_use_subcommand"
+const function generateFishSubcommands(lines: { string }, command: Command, name: string, path: { string })
+    const pathWords = if #path > 0 then " " .. table.concat(path, " ") else ""
+    const parentCondition = if #path > 0 then "__" .. name .. "_at_command prefix" .. pathWords else nil
+    const useSubcommand = "__" .. name .. "_at_command exact" .. pathWords
 
     for _, sub in command._subcommands do
         const desc = escapeFishString(sub.Description)
@@ -358,11 +355,11 @@ const function generateFishSubcommands(lines: { string }, command: Command, name
     end
 
     for _, sub in command._subcommands do
-        const subCondition = (if parentCondition then parentCondition .. "; and " else "")
-            .. "__fish_seen_subcommand_from "
-            .. sub.Name
+        const subPath = table.clone(path)
+        table.insert(subPath, sub.Name)
+        const subCondition = "__" .. name .. "_at_command prefix " .. table.concat(subPath, " ")
         if #sub._subcommands > 0 then
-            generateFishSubcommands(lines, sub, name, subCondition)
+            generateFishSubcommands(lines, sub, name, subPath)
         else
             for _, flag in sub._flags do
                 generateFishFlag(lines, name, flag, subCondition)
@@ -393,7 +390,18 @@ function Completions.fish(command: Command): string
     table.insert(lines, "")
 
     if #command._subcommands > 0 then
-        generateFishSubcommands(lines, command, name, nil)
+        table.insert(lines, "function __" .. name .. "_at_command")
+        table.insert(lines, "    set -l mode $argv[1]")
+        table.insert(lines, "    set -e argv[1]")
+        table.insert(lines, "    set -l words (commandline -opc)")
+        table.insert(lines, "    set -e words[1]")
+        table.insert(lines, "    for expected in $argv")
+        table.insert(lines, '        test "$words[1]" = "$expected"; or return 1')
+        table.insert(lines, "        set -e words[1]")
+        table.insert(lines, "    end")
+        table.insert(lines, '    test "$mode" = prefix; or test (count $words) -eq 0')
+        table.insert(lines, "end")
+        generateFishSubcommands(lines, command, name, {})
     else
         for _, flag in command._flags do
             generateFishFlag(lines, name, flag, nil)
