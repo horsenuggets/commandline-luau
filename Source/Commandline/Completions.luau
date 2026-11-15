@@ -169,7 +169,7 @@ const function zshFlagSpec(flag: Flag): string
     const desc = escapeShellString(flag.Description)
     if flag.Shorthand then
         const exclusion = "(-" .. flag.Shorthand .. " --" .. flag.Name .. ")"
-        const names = "{-" .. flag.Shorthand .. ",--" .. flag.Name .. (if flag.Type then "=}" else "}")
+        const names = "{-" .. flag.Shorthand .. ",--" .. flag.Name .. "}"
         if flag.Type then
             return "'" .. exclusion .. "'" .. names .. "'[" .. desc .. "]:value:_files'"
         else
@@ -177,7 +177,7 @@ const function zshFlagSpec(flag: Flag): string
         end
     else
         if flag.Type then
-            return "'--" .. flag.Name .. "=[" .. desc .. "]:value:_files'"
+            return "'--" .. flag.Name .. "[" .. desc .. "]:value:_files'"
         else
             return "'--" .. flag.Name .. "[" .. desc .. "]'"
         end
@@ -333,7 +333,12 @@ const function generateFishFlag(lines: { string }, name: string, flag: Flag, con
 end
 
 const function generateFishSubcommands(lines: { string }, command: Command, name: string, parentCondition: string?)
-    const useSubcommand = parentCondition or "__fish_use_subcommand"
+    const useSubcommand = if parentCondition
+        then parentCondition .. "; and not __fish_seen_subcommand_from " .. table.concat(
+            getSubcommandNames(command),
+            " "
+        )
+        else "__fish_use_subcommand"
 
     for _, sub in command._subcommands do
         const desc = escapeFishString(sub.Description)
@@ -353,7 +358,9 @@ const function generateFishSubcommands(lines: { string }, command: Command, name
     end
 
     for _, sub in command._subcommands do
-        const subCondition = "__fish_seen_subcommand_from " .. sub.Name
+        const subCondition = (if parentCondition then parentCondition .. "; and " else "")
+            .. "__fish_seen_subcommand_from "
+            .. sub.Name
         if #sub._subcommands > 0 then
             generateFishSubcommands(lines, sub, name, subCondition)
         else

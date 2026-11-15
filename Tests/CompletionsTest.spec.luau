@@ -78,9 +78,23 @@ return function()
                 Subcommands = { makeCommandWithSubcommands() },
             })
             const fish = Completions.fish(cmd)
-            expect(string.find(fish, 'complete -c outer -n "__fish_seen_subcommand_from mytool" -a "build"', 1, true)).to.be.ok()
+            expect(
+                string.find(
+                    fish,
+                    'complete -c outer -n "__fish_seen_subcommand_from mytool; and not __fish_seen_subcommand_from build run init" -a "build"',
+                    1,
+                    true
+                )
+            ).to.be.ok()
             expect(string.find(fish, "complete -c mytool", 1, true)).to.equal(nil)
-            expect(string.find(fish, "__fish_seen_subcommand_from build; and __outer_no_matches", 1, true)).to.be.ok()
+            expect(
+                string.find(
+                    fish,
+                    "__fish_seen_subcommand_from mytool; and __fish_seen_subcommand_from build; and __outer_no_matches",
+                    1,
+                    true
+                )
+            ).to.be.ok()
             const zsh = Completions.zsh(cmd)
             expect(string.find(zsh, "[Target platform.]:value:", 1, true)).to.be.ok()
             expect(string.find(zsh, "        _files", 1, true)).to.be.ok()
@@ -152,7 +166,8 @@ return function()
                 Impl = function() end,
             })
             const output = Completions.zsh(cmd)
-            expect(string.find(output, "'--output=[Output file.]:value:_files'", 1, true)).to.be.ok()
+            expect(string.find(output, "'--output[Output file.]:value:_files'", 1, true)).to.be.ok()
+            expect(string.find(output, "--output=", 1, true)).to.equal(nil)
         end)
 
         it("should fall back to native paths only when no matches were added", function()
@@ -211,11 +226,54 @@ return function()
         it("should complete native paths for typed flag values", function()
             const cmd = makeSimpleCommand()
             const output = Completions.zsh(cmd)
-            expect(string.find(output, "{-o,--output=}'[Output file.]:value:_files'", 1, true)).to.be.ok()
+            expect(string.find(output, "{-o,--output}'[Output file.]:value:_files'", 1, true)).to.be.ok()
+            expect(string.find(output, "--output=", 1, true)).to.equal(nil)
         end)
     end)
 
     describe("fish", function()
+        it("should scope repeated leaf names to their ancestor branches", function()
+            const branches = {}
+            for _, name in { "a", "b" } do
+                table.insert(
+                    branches,
+                    Command.new({
+                        Name = name,
+                        Description = "A command group.",
+                        Subcommands = {
+                            Command.new({
+                                Name = "build",
+                                Description = "Build a branch.",
+                                Flags = {
+                                    Flag.new({
+                                        Name = name .. "-output",
+                                        Type = "string",
+                                        Description = "Output file.",
+                                    }),
+                                },
+                                Impl = function() end,
+                            }),
+                        },
+                    })
+                )
+            end
+            const cmd = Command.new({ Name = "outer", Description = "Test tool.", Subcommands = branches })
+            const output = Completions.fish(cmd)
+            for _, name in { "a", "b" } do
+                const condition = `__fish_seen_subcommand_from {name}; and __fish_seen_subcommand_from build`
+                expect(string.find(output, `-l {name}-output -d 'Output file.' -n "{condition}" -x`, 1, true)).to.be.ok()
+                expect(string.find(output, `-n "{condition}; and __outer_no_matches" -r -F`, 1, true)).to.be.ok()
+                expect(
+                    string.find(
+                        output,
+                        `-n "__fish_seen_subcommand_from {name}; and not __fish_seen_subcommand_from build" -a "build"`,
+                        1,
+                        true
+                    )
+                ).to.be.ok()
+            end
+        end)
+
         it("should use a valid recursion guard for hyphenated command names", function()
             const cmd = makeSimpleCommand()
             cmd.Name = "my-tool"
