@@ -33,6 +33,11 @@ aftman.toml
 /CONTEXT.md
 /TODO.md
 
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+
 # Worktrees
 /.worktrees/
 /.wt/
