@@ -371,24 +371,58 @@ function SelfUpdate.findExecutable(name: string): string?
 end
 
 --[[
-    Returns the platform suffix for GitHub release asset names.
-    Maps process.os and process.arch to the standard naming
-    convention used by Lune cross-compilation targets.
+    Returns the canonical platform suffix for GitHub release asset names, not compiler
+    targets. Optional platform arguments allow normalization to be tested on any host.
 
-    Examples: "macos-aarch64", "linux-x86_64", "windows-x86_64"
+    Examples: "macos-arm64", "linux-x64", "windows-x64"
 ]]
-function SelfUpdate.getPlatformSuffix(): string
-    local os = process.os
+function SelfUpdate.getPlatformSuffix(osName: string?, architecture: string?): string
+    assert(t.optional(t.string)(osName))
+    assert(t.optional(t.string)(architecture))
+
+    local os = osName or process.os
     if os == "macos" or os == "darwin" then
         os = "macos"
     end
 
-    local arch = process.arch
-    if arch == "arm64" then
-        arch = "aarch64"
+    local arch = architecture or process.arch
+    if arch == "x86_64" or arch == "x64" then
+        arch = "x64"
+    elseif arch == "aarch64" or arch == "arm64" then
+        arch = "arm64"
     end
 
     return `{os}-{arch}`
+end
+
+--[[
+    Selects a release download URL, preferring canonical asset names regardless of asset
+    order. Historical architecture names are accepted only at this download boundary.
+]]
+function SelfUpdate.getAssetDownloadUrl(
+    name: string,
+    assets: { { name: string, browser_download_url: string } },
+    platformSuffix: string
+): string?
+    assert(t.string(name))
+    assert(t.array(t.interface({
+        name = t.string,
+        browser_download_url = t.string,
+    }))(assets))
+    assert(t.string(platformSuffix))
+
+    const executableSuffix = if string.match(platformSuffix, "^windows%-") then ".exe" else ""
+    const historicalSuffix = string.gsub(string.gsub(platformSuffix, "%-x64$", "-x86_64"), "%-arm64$", "-aarch64")
+    for _, suffix in { platformSuffix, historicalSuffix } do
+        const assetName = `{name}-{suffix}{executableSuffix}`
+        for _, asset in assets do
+            if asset.name == assetName then
+                return asset.browser_download_url
+            end
+        end
+    end
+
+    return nil
 end
 
 return SelfUpdate

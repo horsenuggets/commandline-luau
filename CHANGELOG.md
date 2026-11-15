@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.5
+
+- Standardized release asset architecture suffixes as x64 and arm64.
+- Preserved installation and updates from historical release asset names.
+- Preferred canonical asset names regardless of release asset ordering.
+
 ## 0.2.4
 - Fix the install command overwriting the installed binary in place, which got running copies killed on macOS
 - Add SelfUpdate.copyBinary and SelfUpdate.getReplacementSteps so every binary write replaces the file instead of overwriting it
