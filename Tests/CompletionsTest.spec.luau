@@ -71,6 +71,21 @@ end
 
 return function()
     describe("generate", function()
+        it("should keep nested fallbacks attached to the executable", function()
+            const cmd = Command.new({
+                Name = "outer",
+                Description = "Nested test tool.",
+                Subcommands = { makeCommandWithSubcommands() },
+            })
+            const fish = Completions.fish(cmd)
+            expect(string.find(fish, 'complete -c outer -n "__outer_at_command exact mytool" -a "build"', 1, true)).to.be.ok()
+            expect(string.find(fish, "complete -c mytool", 1, true)).to.equal(nil)
+            expect(string.find(fish, "__outer_at_command prefix mytool build; and __outer_no_matches", 1, true)).to.be.ok()
+            const zsh = Completions.zsh(cmd)
+            expect(string.find(zsh, "[Target platform.]:value:", 1, true)).to.be.ok()
+            expect(string.find(zsh, "        _files", 1, true)).to.be.ok()
+        end)
+
         it("should throw for unsupported shell", function()
             const cmd = makeSimpleCommand()
             expect(function()
@@ -89,6 +104,12 @@ return function()
     end)
 
     describe("bash", function()
+        it("should continue to leaf flags when root flags have no matches", function()
+            const output = Completions.bash(makeCommandWithSubcommands())
+            expect(string.find(output, "if (( ${#COMPREPLY[@]} > 0 )); then\n            return\n        fi", 1, true)).to.be.ok()
+            expect(string.find(output, "complete -o default -F _mytool mytool", 1, true)).to.be.ok()
+        end)
+
         it("should generate a valid bash completion function", function()
             const cmd = makeSimpleCommand()
             const output = Completions.bash(cmd)
@@ -123,6 +144,40 @@ return function()
     end)
 
     describe("zsh", function()
+        it("should support path values for long-only typed options", function()
+            const cmd = Command.new({
+                Name = "mytool",
+                Description = "A test tool.",
+                Flags = { Flag.new({ Name = "output", Type = "string", Description = "Output file." }) },
+                Impl = function() end,
+            })
+            const output = Completions.zsh(cmd)
+            expect(string.find(output, "'--output[Output file.]:value:_files'", 1, true)).to.be.ok()
+            expect(string.find(output, "--output=", 1, true)).to.equal(nil)
+        end)
+
+        it("should fall back to native paths only when no matches were added", function()
+            for _, cmd in { makeSimpleCommand(), makeCommandWithSubcommands() } do
+                const output = Completions.zsh(cmd)
+                expect(string.find(output, "local matches_before=$compstate[nmatches]", 1, true)).to.be.ok()
+                expect(
+                    string.find(
+                        output,
+                        "if (( compstate[nmatches] == matches_before )); then\n        _files\n    fi",
+                        1,
+                        true
+                    )
+                ).to.be.ok()
+                expect(string.find(output, "'*:arg:_files'", 1, true)).to.be.ok()
+            end
+        end)
+
+        it("should parse typed leaf options before falling back to paths", function()
+            const output = Completions.zsh(makeCommandWithSubcommands())
+            expect(string.find(output, "[Target platform.]:value:", 1, true)).to.be.ok()
+            expect(string.find(output, "[Server port.]:value:", 1, true)).to.be.ok()
+        end)
+
         it("should generate a valid zsh completion function", function()
             const cmd = makeSimpleCommand()
             const output = Completions.zsh(cmd)
@@ -154,19 +209,86 @@ return function()
             expect(string.find(output, "compadd %-V unsorted %-l %-d display_cmds %-a cmd_names")).to.be.ok()
         end)
 
-        it("should include typed flag value placeholder", function()
+        it("should complete native paths for typed flag values", function()
             const cmd = makeSimpleCommand()
             const output = Completions.zsh(cmd)
-            -- --output is typed (string), should have :value:
-            expect(string.find(output, "%[Output file%.%]:value:")).to.be.ok()
+            expect(string.find(output, "{-o,--output}'[Output file.]:value:_files'", 1, true)).to.be.ok()
+            expect(string.find(output, "--output=", 1, true)).to.equal(nil)
         end)
     end)
 
     describe("fish", function()
-        it("should generate fish completions with disable-default", function()
-            const cmd = makeSimpleCommand()
+        it("should distinguish repeated command names by their ordered positions", function()
+            const leaf = makeSimpleCommand()
+            leaf.Name = "build"
+            const cmd = Command.new({
+                Name = "outer",
+                Description = "Test tool.",
+                Subcommands = {
+                    Command.new({ Name = "build", Description = "Build group.", Subcommands = { leaf } }),
+                },
+            })
             const output = Completions.fish(cmd)
-            expect(string.find(output, "complete %-c mytool %-f")).to.be.ok()
+            expect(string.find(output, '-n "__outer_at_command exact build" -a "build"', 1, true)).to.be.ok()
+            expect(
+                string.find(output, '-n "__outer_at_command prefix build build; and __outer_no_matches" -r -F', 1, true)
+            ).to.be.ok()
+            expect(string.find(output, 'test "$words[1]" = "$expected"; or return 1', 1, true)).to.be.ok()
+            expect(string.find(output, 'test "$mode" = prefix; or test (count $words) -eq 0', 1, true)).to.be.ok()
+            expect(string.find(output, "__fish_seen_subcommand_from", 1, true)).to.equal(nil)
+        end)
+
+        it("should scope repeated leaf names to their ancestor branches", function()
+            const branches = {}
+            for _, name in { "a", "b" } do
+                table.insert(
+                    branches,
+                    Command.new({
+                        Name = name,
+                        Description = "A command group.",
+                        Subcommands = {
+                            Command.new({
+                                Name = "build",
+                                Description = "Build a branch.",
+                                Flags = {
+                                    Flag.new({
+                                        Name = name .. "-output",
+                                        Type = "string",
+                                        Description = "Output file.",
+                                    }),
+                                },
+                                Impl = function() end,
+                            }),
+                        },
+                    })
+                )
+            end
+            const cmd = Command.new({ Name = "outer", Description = "Test tool.", Subcommands = branches })
+            const output = Completions.fish(cmd)
+            for _, name in { "a", "b" } do
+                const condition = `__outer_at_command prefix {name} build`
+                expect(string.find(output, `-l {name}-output -d 'Output file.' -n "{condition}" -x`, 1, true)).to.be.ok()
+                expect(string.find(output, `-n "{condition}; and __outer_no_matches" -r -F`, 1, true)).to.be.ok()
+                expect(string.find(output, `-n "__outer_at_command exact {name}" -a "build"`, 1, true)).to.be.ok()
+            end
+        end)
+
+        it("should use a valid recursion guard for hyphenated command names", function()
+            const cmd = makeSimpleCommand()
+            cmd.Name = "my-tool"
+            const output = Completions.fish(cmd)
+            expect(string.find(output, "function __my-tool_no_matches", 1, true)).to.be.ok()
+            expect(string.find(output, "set -g __commandline_completion_probing 1", 1, true)).to.be.ok()
+            expect(string.find(output, "set -g __my-tool", 1, true)).to.equal(nil)
+        end)
+
+        it("should enable native files only when custom completion has no matches", function()
+            const output = Completions.fish(makeSimpleCommand())
+            expect(string.find(output, 'complete -c mytool -F -n "__mytool_no_matches"', 1, true)).to.be.ok()
+            expect(string.find(output, "set -q __commandline_completion_probing; and return 1", 1, true)).to.be.ok()
+            expect(string.find(output, "complete -C (commandline -cp)", 1, true)).to.be.ok()
+            expect(string.find(output, "set -e __commandline_completion_probing", 1, true)).to.be.ok()
+            expect(string.find(output, "test (count $matches) -eq 0", 1, true)).to.be.ok()
         end)
 
         it("should include flag long names", function()
@@ -190,30 +312,33 @@ return function()
             expect(string.find(output, "Output file")).to.be.ok()
         end)
 
-        it("should use -r for typed flags", function()
-            const cmd = makeSimpleCommand()
-            const output = Completions.fish(cmd)
-            -- --output is typed, should have -r (requires argument)
-            -- --verbose is boolean, should not have -r
-            const lines = string.split(output, "\n")
-            for _, line in lines do
-                if string.find(line, "%-l output") then
-                    expect(string.find(line, "%-r")).to.be.ok()
-                end
-                if string.find(line, "%-l verbose") and not string.find(line, "output") then
-                    expect(string.find(line, "%-r")).to.equal(nil)
+        it("should probe typed options without files and enable their native fallback", function()
+            const output = Completions.fish(makeSimpleCommand())
+            expect(string.find(output, "-l output -s o -d 'Output file.' -x", 1, true)).to.be.ok()
+            expect(string.find(output, '-n "__mytool_no_matches" -r -F', 1, true)).to.be.ok()
+            for _, line in string.split(output, "\n") do
+                if string.find(line, "-l verbose", 1, true) then
+                    expect(string.find(line, "-r", 1, true)).to.equal(nil)
+                    expect(string.find(line, "-x", 1, true)).to.equal(nil)
+                    expect(string.find(line, "-F", 1, true)).to.equal(nil)
                 end
             end
+        end)
+
+        it("should retain subcommand conditions on typed option fallbacks", function()
+            const output = Completions.fish(makeCommandWithSubcommands())
+            expect(string.find(output, '-n "__mytool_at_command prefix build; and __mytool_no_matches" -r -F', 1, true)).to.be.ok()
+            expect(string.find(output, '-n "__mytool_at_command prefix run; and __mytool_no_matches" -r -F', 1, true)).to.be.ok()
         end)
 
         it("should include subcommand completions with conditions", function()
             const cmd = makeCommandWithSubcommands()
             const output = Completions.fish(cmd)
-            expect(string.find(output, "__fish_use_subcommand")).to.be.ok()
+            expect(string.find(output, "__mytool_at_command exact")).to.be.ok()
             expect(string.find(output, '%-a "build"')).to.be.ok()
             expect(string.find(output, '%-a "run"')).to.be.ok()
-            expect(string.find(output, "__fish_seen_subcommand_from build")).to.be.ok()
-            expect(string.find(output, "__fish_seen_subcommand_from run")).to.be.ok()
+            expect(string.find(output, "__mytool_at_command prefix build")).to.be.ok()
+            expect(string.find(output, "__mytool_at_command prefix run")).to.be.ok()
         end)
     end)
 

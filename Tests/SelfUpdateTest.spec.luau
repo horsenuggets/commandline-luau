@@ -586,7 +586,81 @@ return function()
         end)
     end)
 
+    describe("getAssetDownloadUrl", function()
+        for _, osName in { "linux", "macos", "windows" } do
+            for _, architecture in { { "x64", "x86_64" }, { "arm64", "aarch64" } } do
+                const suffix = SelfUpdate.getPlatformSuffix(osName, architecture[1])
+                const extension = if osName == "windows" then ".exe" else ""
+                const canonicalName = `tool-{suffix}{extension}`
+                const historicalName = `tool-{osName}-{architecture[2]}{extension}`
+                const canonical = { name = canonicalName, browser_download_url = "https://example.com/canonical" }
+                const historical = { name = historicalName, browser_download_url = "https://example.com/historical" }
+
+                it(`should select canonical and historical assets for {suffix}`, function()
+                    expect(SelfUpdate.getAssetDownloadUrl("tool", { canonical }, suffix)).to.equal(
+                        canonical.browser_download_url
+                    )
+                    expect(SelfUpdate.getAssetDownloadUrl("tool", { historical }, suffix)).to.equal(
+                        historical.browser_download_url
+                    )
+                end)
+
+                it(`should prefer canonical assets in either order for {suffix}`, function()
+                    for _, assets in { { historical, canonical }, { canonical, historical } } do
+                        expect(SelfUpdate.getAssetDownloadUrl("tool", assets, suffix)).to.equal(
+                            canonical.browser_download_url
+                        )
+                    end
+                end)
+
+                it(`should reject unrelated assets for {suffix}`, function()
+                    for _, assetName in
+                        {
+                            `other-{suffix}{extension}`,
+                            `tool-{suffix}{extension}.zip`,
+                            `tool-{osName}-{if architecture[1] == "x64" then "arm64" else "x64"}{extension}`,
+                            `tool-other-{architecture[2]}{extension}`,
+                            `tool-{osName}-{architecture[2]}{extension}.sha256`,
+                            `tool-{suffix}{if extension == "" then ".exe" else ""}`,
+                        }
+                    do
+                        expect(SelfUpdate.getAssetDownloadUrl("tool", {
+                            { name = assetName, browser_download_url = "https://example.com/unrelated" },
+                        }, suffix)).to.equal(nil)
+                    end
+                    expect(SelfUpdate.getAssetDownloadUrl("tool", {}, suffix)).to.equal(nil)
+                end)
+            end
+        end
+    end)
+
     describe("getPlatformSuffix", function()
+        it("should normalize OS and architecture aliases", function()
+            for _, osName in { "darwin", "linux", "macos", "windows" } do
+                const expectedOs = if osName == "darwin" then "macos" else osName
+                for _, architecture in
+                    { { "x86_64", "x64" }, { "x64", "x64" }, { "aarch64", "arm64" }, { "arm64", "arm64" } }
+                do
+                    const expected = `{expectedOs}-{architecture[2]}`
+                    expect(SelfUpdate.getPlatformSuffix(osName, architecture[1])).to.equal(expected)
+                    expect(SelfUpdate.getPlatformSuffix(osName, architecture[1])).to.equal(expected)
+                end
+            end
+        end)
+
+        it("should preserve unknown platforms instead of selecting another architecture", function()
+            expect(SelfUpdate.getPlatformSuffix("freebsd", "riscv64")).to.equal("freebsd-riscv64")
+        end)
+
+        it("should reject invalid platform arguments", function()
+            expect(function()
+                SelfUpdate.getPlatformSuffix(1 :: any, "x64")
+            end).to.throw()
+            expect(function()
+                SelfUpdate.getPlatformSuffix("linux", false :: any)
+            end).to.throw()
+        end)
+
         it("should return a non-empty string", function()
             const suffix = SelfUpdate.getPlatformSuffix()
             expect(type(suffix)).to.equal("string")
@@ -601,7 +675,7 @@ return function()
 
         it("should contain an architecture component", function()
             const suffix = SelfUpdate.getPlatformSuffix()
-            const hasArch = string.find(suffix, "x86_64") or string.find(suffix, "aarch64")
+            const hasArch = string.find(suffix, "x64") or string.find(suffix, "arm64")
             expect(hasArch).to.be.ok()
         end)
 

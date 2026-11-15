@@ -401,14 +401,7 @@ function Toolkit.installCommand(options: {
 
         const platformSuffix = SelfUpdate.getPlatformSuffix()
         const assetName = `{name}-{platformSuffix}{EXECUTABLE_SUFFIX}`
-        local downloadUrl: string? = nil
-
-        for _, asset in release.assets or {} do
-            if asset.name == assetName then
-                downloadUrl = asset.browser_download_url
-                break
-            end
-        end
+        const downloadUrl = SelfUpdate.getAssetDownloadUrl(name, release.assets or {}, platformSuffix)
 
         if not downloadUrl then
             print(Chalk.red(`Asset "{assetName}" not found in latest release.`))
@@ -561,9 +554,6 @@ function Toolkit.updateCommand(options: {
     const currentVersion = options.Version
     const repository = options.Repository
 
-    const IS_WINDOWS = process.os == "windows"
-    const EXECUTABLE_SUFFIX = if IS_WINDOWS then ".exe" else ""
-
     const function getRelease(targetVersion: string?): { version: string, assets: { any } }?
         local url: string
         if targetVersion then
@@ -636,15 +626,7 @@ function Toolkit.updateCommand(options: {
 
             -- Find download URL for current platform
             const platformSuffix = SelfUpdate.getPlatformSuffix()
-            const assetName = `{name}-{platformSuffix}{EXECUTABLE_SUFFIX}`
-            local downloadUrl: string? = nil
-
-            for _, asset in release.assets do
-                if asset.name == assetName then
-                    downloadUrl = asset.browser_download_url
-                    break
-                end
-            end
+            const downloadUrl = SelfUpdate.getAssetDownloadUrl(name, release.assets, platformSuffix)
 
             if not downloadUrl then
                 print(Chalk.red(`Binary for {platformSuffix} not found in release {newVersion}.`))

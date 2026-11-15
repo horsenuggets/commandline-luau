@@ -136,7 +136,9 @@ function Completions.bash(command: Command): string
     if #flagWords > 0 then
         table.insert(lines, '    if [[ "$cur" == -* ]]; then')
         table.insert(lines, '        COMPREPLY=($(compgen -W "' .. table.concat(flagWords, " ") .. '" -- "$cur"))')
-        table.insert(lines, "        return")
+        table.insert(lines, "        if (( " .. shellVar("#COMPREPLY[@]") .. " > 0 )); then")
+        table.insert(lines, "            return")
+        table.insert(lines, "        fi")
         table.insert(lines, "    fi")
         table.insert(lines, "")
     end
@@ -169,13 +171,13 @@ const function zshFlagSpec(flag: Flag): string
         const exclusion = "(-" .. flag.Shorthand .. " --" .. flag.Name .. ")"
         const names = "{-" .. flag.Shorthand .. ",--" .. flag.Name .. "}"
         if flag.Type then
-            return "'" .. exclusion .. "'" .. names .. "'[" .. desc .. "]:value:'"
+            return "'" .. exclusion .. "'" .. names .. "'[" .. desc .. "]:value:_files'"
         else
             return "'" .. exclusion .. "'" .. names .. "'[" .. desc .. "]'"
         end
     else
         if flag.Type then
-            return "'--" .. flag.Name .. "[" .. desc .. "]:value:'"
+            return "'--" .. flag.Name .. "[" .. desc .. "]:value:_files'"
         else
             return "'--" .. flag.Name .. "[" .. desc .. "]'"
         end
@@ -248,32 +250,11 @@ const function generateZshSubcommands(lines: { string }, command: Command, inden
             generateZshSubcommands(lines, sub, indent .. "                ")
         else
             const subIndent = indent .. "                "
-            table.insert(lines, subIndent .. "local -a flag_display flag_names")
+            table.insert(lines, subIndent .. "_arguments \\")
             for _, flag in sub._flags do
-                const desc = escapeShellString(flag.Description)
-                const nameDisplay = if flag.Shorthand
-                    then "-" .. flag.Shorthand .. ", --" .. flag.Name
-                    else "--" .. flag.Name
-                table.insert(
-                    lines,
-                    subIndent
-                        .. "flag_display+=($'"
-                        .. dim
-                        .. "> "
-                        .. reset
-                        .. blue
-                        .. nameDisplay
-                        .. reset
-                        .. " "
-                        .. dim
-                        .. "-- "
-                        .. desc
-                        .. reset
-                        .. "')"
-                )
-                table.insert(lines, subIndent .. "flag_names+=('--" .. flag.Name .. "')")
+                table.insert(lines, subIndent .. "    " .. zshFlagSpec(flag) .. " \\")
             end
-            table.insert(lines, subIndent .. "compadd -V unsorted -l -d flag_display -a flag_names")
+            table.insert(lines, subIndent .. "    '*:arg:_files'")
         end
 
         table.insert(lines, indent .. "                ;;")
@@ -293,6 +274,9 @@ function Completions.zsh(command: Command): string
     table.insert(lines, "#compdef " .. name)
     table.insert(lines, "")
     table.insert(lines, "_" .. name .. "() {")
+    table.insert(lines, "    local context state state_descr line")
+    table.insert(lines, "    local -A opt_args")
+    table.insert(lines, "    local matches_before=$compstate[nmatches]")
     -- Style completions to match the CLI help output:
     -- bright blue command names, dim gray separator and descriptions
     table.insert(lines, "    zstyle ':completion:*:" .. name .. ":*' group-name ''")
@@ -311,9 +295,12 @@ function Completions.zsh(command: Command): string
         for _, spec in flagSpecs do
             table.insert(lines, "        " .. spec .. " \\")
         end
-        table.insert(lines, "        '*:file:_files'")
+        table.insert(lines, "        '*:arg:_files'")
     end
 
+    table.insert(lines, "    if (( compstate[nmatches] == matches_before )); then")
+    table.insert(lines, "        _files")
+    table.insert(lines, "    fi")
     table.insert(lines, "}")
     table.insert(lines, "")
     table.insert(lines, "_" .. name .. ' "$@"')
@@ -324,9 +311,31 @@ end
 
 -- Fish completion generator
 
-const function generateFishSubcommands(lines: { string }, command: Command, parentCondition: string?)
-    const name = command.Name
-    const useSubcommand = parentCondition or "__fish_use_subcommand"
+const function generateFishFlag(lines: { string }, name: string, flag: Flag, condition: string?)
+    const parts = { "complete -c " .. name }
+    table.insert(parts, "-l " .. flag.Name)
+    if flag.Shorthand then
+        table.insert(parts, "-s " .. flag.Shorthand)
+    end
+    table.insert(parts, "-d '" .. escapeFishString(flag.Description) .. "'")
+    if flag.Type then
+        -- Probe without files first, then enable native files only for empty results.
+        const fallbackCondition = (if condition then condition .. "; and " else "") .. "__" .. name .. "_no_matches"
+        table.insert(
+            lines,
+            table.concat(parts, " ") .. (if condition then ' -n "' .. condition .. '"' else "") .. " -x"
+        )
+        table.insert(parts, '-n "' .. fallbackCondition .. '" -r -F')
+    elseif condition then
+        table.insert(parts, '-n "' .. condition .. '"')
+    end
+    table.insert(lines, table.concat(parts, " "))
+end
+
+const function generateFishSubcommands(lines: { string }, command: Command, name: string, path: { string })
+    const pathWords = if #path > 0 then " " .. table.concat(path, " ") else ""
+    const parentCondition = if #path > 0 then "__" .. name .. "_at_command prefix" .. pathWords else nil
+    const useSubcommand = "__" .. name .. "_at_command exact" .. pathWords
 
     for _, sub in command._subcommands do
         const desc = escapeFishString(sub.Description)
@@ -338,26 +347,7 @@ const function generateFishSubcommands(lines: { string }, command: Command, pare
     table.insert(lines, "")
 
     for _, flag in command._flags do
-        const desc = escapeFishString(flag.Description)
-        const parts = { "complete -c " .. name }
-
-        if parentCondition then
-            table.insert(parts, '-n "' .. parentCondition .. '"')
-        end
-
-        table.insert(parts, "-l " .. flag.Name)
-
-        if flag.Shorthand then
-            table.insert(parts, "-s " .. flag.Shorthand)
-        end
-
-        table.insert(parts, "-d '" .. desc .. "'")
-
-        if flag.Type then
-            table.insert(parts, "-r")
-        end
-
-        table.insert(lines, table.concat(parts, " "))
+        generateFishFlag(lines, name, flag, parentCondition)
     end
 
     if #command._flags > 0 then
@@ -365,22 +355,14 @@ const function generateFishSubcommands(lines: { string }, command: Command, pare
     end
 
     for _, sub in command._subcommands do
-        const subCondition = "__fish_seen_subcommand_from " .. sub.Name
+        const subPath = table.clone(path)
+        table.insert(subPath, sub.Name)
+        const subCondition = "__" .. name .. "_at_command prefix " .. table.concat(subPath, " ")
         if #sub._subcommands > 0 then
-            generateFishSubcommands(lines, sub, subCondition)
+            generateFishSubcommands(lines, sub, name, subPath)
         else
             for _, flag in sub._flags do
-                const desc = escapeFishString(flag.Description)
-                const parts = { "complete -c " .. name .. ' -n "' .. subCondition .. '"' }
-                table.insert(parts, "-l " .. flag.Name)
-                if flag.Shorthand then
-                    table.insert(parts, "-s " .. flag.Shorthand)
-                end
-                table.insert(parts, "-d '" .. desc .. "'")
-                if flag.Type then
-                    table.insert(parts, "-r")
-                end
-                table.insert(lines, table.concat(parts, " "))
+                generateFishFlag(lines, name, flag, subCondition)
             end
             if #sub._flags > 0 then
                 table.insert(lines, "")
@@ -396,24 +378,33 @@ function Completions.fish(command: Command): string
     const lines = {}
 
     table.insert(lines, "# Completions for " .. name)
+    table.insert(lines, "function __" .. name .. "_no_matches")
+    table.insert(lines, "    set -q __commandline_completion_probing; and return 1")
+    table.insert(lines, "    set -g __commandline_completion_probing 1")
+    table.insert(lines, "    set -l matches (complete -C (commandline -cp))")
+    table.insert(lines, "    set -e __commandline_completion_probing")
+    table.insert(lines, "    test (count $matches) -eq 0")
+    table.insert(lines, "end")
     table.insert(lines, "complete -c " .. name .. " -f")
+    table.insert(lines, "complete -c " .. name .. ' -F -n "__' .. name .. '_no_matches"')
     table.insert(lines, "")
 
     if #command._subcommands > 0 then
-        generateFishSubcommands(lines, command, nil)
+        table.insert(lines, "function __" .. name .. "_at_command")
+        table.insert(lines, "    set -l mode $argv[1]")
+        table.insert(lines, "    set -e argv[1]")
+        table.insert(lines, "    set -l words (commandline -opc)")
+        table.insert(lines, "    set -e words[1]")
+        table.insert(lines, "    for expected in $argv")
+        table.insert(lines, '        test "$words[1]" = "$expected"; or return 1')
+        table.insert(lines, "        set -e words[1]")
+        table.insert(lines, "    end")
+        table.insert(lines, '    test "$mode" = prefix; or test (count $words) -eq 0')
+        table.insert(lines, "end")
+        generateFishSubcommands(lines, command, name, {})
     else
         for _, flag in command._flags do
-            const desc = escapeFishString(flag.Description)
-            const parts = { "complete -c " .. name }
-            table.insert(parts, "-l " .. flag.Name)
-            if flag.Shorthand then
-                table.insert(parts, "-s " .. flag.Shorthand)
-            end
-            table.insert(parts, "-d '" .. desc .. "'")
-            if flag.Type then
-                table.insert(parts, "-r")
-            end
-            table.insert(lines, table.concat(parts, " "))
+            generateFishFlag(lines, name, flag, nil)
         end
     end
 
