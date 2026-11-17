@@ -49,6 +49,9 @@ const function readFile(dir: string, relativePath: string): string
     return fs.readFile(dir .. "/" .. relativePath)
 end
 
+const Testable = require("@devpackages/Testable")
+const describe, expect, it = Testable.describe, Testable.expect, Testable.it
+
 return function()
     describe("generateVersion", function()
         it("should generate a version module from a VERSION file", function()

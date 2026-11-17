@@ -41,6 +41,9 @@ const function indexOf(steps: { string }, step: string): number?
     return table.find(steps, step)
 end
 
+const Testable = require("@devpackages/Testable")
+const describe, expect, it = Testable.describe, Testable.expect, Testable.it
+
 return function()
     describe("getReplacementSteps", function()
         const EXPECTED = {

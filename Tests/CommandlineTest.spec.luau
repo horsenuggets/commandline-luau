@@ -8,6 +8,10 @@ Tests for the Commandline module, covering exports, command registration, and ex
 
 const Commandline = require("../Source/Commandline")
 
+const Testable = require("@devpackages/Testable")
+const afterEach, beforeEach, describe, expect, it =
+    Testable.afterEach, Testable.beforeEach, Testable.describe, Testable.expect, Testable.it
+
 return function()
     beforeEach(function()
         Commandline._commands = {}

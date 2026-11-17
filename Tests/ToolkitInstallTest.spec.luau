@@ -19,6 +19,9 @@ const TEST_OPTIONS = {
     Repository = "user/repo",
 }
 
+const Testable = require("@devpackages/Testable")
+const describe, expect, it = Testable.describe, Testable.expect, Testable.it
+
 return function()
     describe("installCommand", function()
         it("should return a Command with name 'install'", function()

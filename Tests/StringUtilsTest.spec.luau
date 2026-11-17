@@ -9,6 +9,9 @@ capitalization, validation, and tokenization.
 
 const StringUtils = require("../Source/Commandline/Helpers/StringUtils")
 
+const Testable = require("@devpackages/Testable")
+const describe, expect, it = Testable.describe, Testable.expect, Testable.it
+
 return function()
     describe("StringUtils.capitalizeFirstLetter", function()
         it("should capitalize the first letter of a string", function()
