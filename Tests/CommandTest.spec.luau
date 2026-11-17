@@ -11,6 +11,9 @@ const Arg = require("../Source/Commandline/Arg")
 const Command = require("../Source/Commandline/Command")
 const Flag = require("../Source/Commandline/Flag")
 
+const Testable = require("@devpackages/Testable")
+const describe, expect, it = Testable.describe, Testable.expect, Testable.it
+
 return function()
     describe("Command.new", function()
         it("should create a basic Command with required fields", function()
