@@ -9,6 +9,7 @@ definitions.
 --]]
 
 const Commandline = require("@commandline")
+const fs = require("@lune/fs")
 const process = require("@lune/process")
 
 const Command = Commandline.Command
@@ -70,21 +71,23 @@ const function makeCommandWithSubcommands(): any
     })
 end
 
--- Exercise the generated code inside an actual completion widget, without reading or
+-- Autoload the generated file inside an actual completion widget, without reading or
 -- writing a user's shell configuration. The bounded loop also handles startup failures.
 const function completeZsh(command: any, input: string): string
-    const result = process.exec("zsh", {
+    const directory = `{tostring(project)}/Build/ZshCompletionTests/{os.time()}-{math.random(1, 1e9)}`
+    fs.writeDir(directory)
+    fs.writeFile(`{directory}/_{command.Name}`, Completions.zsh(command))
+    const ok, result = pcall(process.exec, "zsh", {
         "-f",
         "-c",
         [=[
             zmodload zsh/zpty
             zmodload zsh/zselect
             child='
+                fpath=( "$TEST_FPATH" $fpath )
                 autoload -Uz compinit
                 compinit -D
                 bindkey -e
-                _test_completion() { eval "$TEST_COMPLETION"; }
-                compdef _test_completion "$TEST_NAME"
                 compdef _normal -value-
                 _capture() {
                     _main_complete
@@ -118,11 +121,12 @@ const function completeZsh(command: any, input: string): string
     }, {
         env = {
             TERM = "xterm-256color",
-            TEST_COMPLETION = Completions.zsh(command),
+            TEST_FPATH = directory,
             TEST_INPUT = input,
-            TEST_NAME = command.Name,
         },
     })
+    fs.removeDir(directory)
+    assert(ok, tostring(result))
     assert(result.ok, result.stdout .. result.stderr)
     return result.stdout
 end
