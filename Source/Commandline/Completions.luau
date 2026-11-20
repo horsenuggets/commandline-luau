@@ -184,82 +184,69 @@ const function zshFlagSpec(flag: Flag): string
     end
 end
 
-const function generateZshSubcommands(lines: { string }, command: Command, indent: string)
-    if #command._subcommands == 0 then
-        return
-    end
+const function zshDisplay(text: string): string
+    const escaped = string.gsub(string.gsub(string.gsub(text, "\\", "\\\\"), "'", "\\'"), "\n", "\\n")
+    return "$'" .. string.gsub(escaped, "\27", "\\e") .. "'"
+end
 
-    table.insert(lines, indent .. "local -a commands=(")
+const function generateZshFlags(lines: { string }, command: Command, indent: string, rootName: string)
+    table.insert(lines, indent .. "local -a flag_names=() flag_shorts=() flag_long_displays=() flag_pair_displays=()")
+    for _, flag in command._flags do
+        const long = "--" .. flag.Name
+        const short = if flag.Shorthand then "-" .. flag.Shorthand else ""
+        const description = "\27[90m-- \27[3m" .. flag.Description .. "\27[0m"
+        const longDisplay = "\27[94m" .. long .. "\27[0m " .. description
+        const paired = if short ~= ""
+            then "\27[94m" .. short .. "\27[90m, \27[94m" .. long .. "\27[0m " .. description
+            else longDisplay
+        table.insert(lines, indent .. "flag_names+=(" .. zshDisplay(long) .. ")")
+        table.insert(lines, indent .. "flag_shorts+=(" .. zshDisplay(short) .. ")")
+        table.insert(lines, indent .. "flag_long_displays+=(" .. zshDisplay(longDisplay) .. ")")
+        table.insert(lines, indent .. "flag_pair_displays+=(" .. zshDisplay(paired) .. ")")
+    end
+    table.insert(lines, indent .. "local -a command_names=(")
     for _, sub in command._subcommands do
-        const desc = escapeShellString(sub.Description)
-        table.insert(lines, indent .. "    '" .. sub.Name .. ":" .. desc .. "'")
+        table.insert(lines, indent .. "    '" .. escapeShellString(sub.Name) .. "'")
     end
     table.insert(lines, indent .. ")")
-    table.insert(lines, "")
-
-    const flagSpecs = {}
+    table.insert(lines, indent .. "local -a flag_specs=(")
     for _, flag in command._flags do
-        table.insert(flagSpecs, zshFlagSpec(flag))
+        table.insert(lines, indent .. "    " .. zshFlagSpec(flag))
     end
+    table.insert(lines, indent .. ")")
+    table.insert(lines, indent .. "if _" .. rootName .. '_options "$flag_specs[@]"; then')
+    table.insert(lines, indent .. "    return")
+    table.insert(lines, indent .. "fi")
+end
 
-    table.insert(lines, indent .. "_arguments -C \\")
-    for _, spec in flagSpecs do
-        table.insert(lines, indent .. "    " .. spec .. " \\")
+const function generateZshSubcommands(lines: { string }, command: Command, indent: string, rootName: string)
+    generateZshFlags(lines, command, indent, rootName)
+    -- Hidden specs retain zsh's value parsing without its padded option display.
+    table.insert(lines, indent .. 'local -a hidden_specs=( "${(@)^flag_specs/#/!}" )')
+    table.insert(lines, indent .. '_arguments -C "$hidden_specs[@]" \\')
+    if #command._subcommands == 0 then
+        table.insert(lines, indent .. "    '*:arg:_files'")
+        return
     end
     table.insert(lines, indent .. "    '1:command:->cmd' \\")
     table.insert(lines, indent .. "    '*::arg:->args'")
-    table.insert(lines, "")
-
     table.insert(lines, indent .. "case $state in")
     table.insert(lines, indent .. "    cmd)")
     table.insert(lines, indent .. "        local -a display_cmds cmd_names")
-    const esc = "\\e"
-    const blue = esc .. "[94m"
-    const dim = esc .. "[90m"
-    const reset = esc .. "[0m"
     for _, sub in command._subcommands do
-        const desc = escapeShellString(sub.Description)
-        table.insert(
-            lines,
-            indent
-                .. "        display_cmds+=($'"
-                .. dim
-                .. "> "
-                .. reset
-                .. blue
-                .. sub.Name
-                .. reset
-                .. " "
-                .. dim
-                .. "-- "
-                .. desc
-                .. reset
-                .. "')"
-        )
-        table.insert(lines, indent .. "        cmd_names+=('" .. sub.Name .. "')")
+        const display = "\27[94m" .. sub.Name .. "\27[0m \27[90m-- \27[3m" .. sub.Description .. "\27[0m"
+        table.insert(lines, indent .. "        display_cmds+=(" .. zshDisplay(display) .. ")")
+        table.insert(lines, indent .. "        cmd_names+=('" .. escapeShellString(sub.Name) .. "')")
     end
     table.insert(lines, indent .. "        compadd -V unsorted -l -d display_cmds -a cmd_names")
     table.insert(lines, indent .. "        ;;")
     table.insert(lines, indent .. "    args)")
     table.insert(lines, indent .. "        case $words[1] in")
-
     for _, sub in command._subcommands do
-        table.insert(lines, indent .. "            " .. sub.Name .. ")")
-
-        if #sub._subcommands > 0 then
-            generateZshSubcommands(lines, sub, indent .. "                ")
-        else
-            const subIndent = indent .. "                "
-            table.insert(lines, subIndent .. "_arguments \\")
-            for _, flag in sub._flags do
-                table.insert(lines, subIndent .. "    " .. zshFlagSpec(flag) .. " \\")
-            end
-            table.insert(lines, subIndent .. "    '*:arg:_files'")
-        end
-
+        table.insert(lines, indent .. "            '" .. escapeShellString(sub.Name) .. "')")
+        generateZshSubcommands(lines, sub, indent .. "                ", rootName)
         table.insert(lines, indent .. "                ;;")
     end
-
     table.insert(lines, indent .. "        esac")
     table.insert(lines, indent .. "        ;;")
     table.insert(lines, indent .. "esac")
@@ -273,30 +260,42 @@ function Completions.zsh(command: Command): string
 
     table.insert(lines, "#compdef " .. name)
     table.insert(lines, "")
+    table.insert(lines, "_" .. name .. "_options() {")
+    table.insert(
+        lines,
+        [=[
+        [[ $PREFIX == -* ]] || return 1
+        local -a next direct odirect equal descrs actions subcs positional available candidates displays
+        local -A used
+        local index candidate
+        comparguments -i '' : "$@" '*:arg:->arg' || return 1
+        comparguments -D descrs actions subcs
+        # A dash can be part of a required value, not an option name.
+        [[ -n ${subcs[(r)option-*]} ]] && return 1
+        comparguments -W positional used 0
+        # Let _arguments shift words before completing a nested command.
+        [[ -n $positional[1] && -n ${command_names[(r)$positional[1]]} ]] && return 1
+        comparguments -O next direct odirect equal || return 1
+        available=( "${(@)next%%:*}" "${(@)direct%%:*}" "${(@)odirect%%:*}" "${(@)equal%%:*}" )
+        for (( index=1; index <= $#flag_names; index++ )); do
+            candidate=$flag_names[index]
+            [[ -n ${available[(r)$candidate]} ]] || continue
+            if [[ $PREFIX == --* || -z $flag_shorts[index] ]]; then
+                displays+=( "$flag_long_displays[index]" )
+            else
+                candidate=$flag_shorts[index]
+                displays+=( "$flag_pair_displays[index]" )
+            fi
+            candidates+=( "$candidate" )
+        done
+        compadd -V unsorted -l -d displays -a candidates
+    }]=]
+    )
     table.insert(lines, "_" .. name .. "() {")
     table.insert(lines, "    local context state state_descr line")
     table.insert(lines, "    local -A opt_args")
     table.insert(lines, "    local matches_before=$compstate[nmatches]")
-    -- Style completions to match the CLI help output:
-    -- bright blue command names, dim gray separator and descriptions
-    table.insert(lines, "    zstyle ':completion:*:" .. name .. ":*' group-name ''")
-    table.insert(lines, "    zstyle ':completion:*:" .. name .. ":*:descriptions' format ''")
-    table.insert(lines, "    zstyle ':completion:*:" .. name .. ":*' list-colors '=(#b)([^ ]#)([ ]#-- *)=90=94'")
-    table.insert(lines, "")
-
-    if #command._subcommands > 0 then
-        generateZshSubcommands(lines, command, "    ")
-    else
-        const flagSpecs = {}
-        for _, flag in command._flags do
-            table.insert(flagSpecs, zshFlagSpec(flag))
-        end
-        table.insert(lines, "    _arguments \\")
-        for _, spec in flagSpecs do
-            table.insert(lines, "        " .. spec .. " \\")
-        end
-        table.insert(lines, "        '*:arg:_files'")
-    end
+    generateZshSubcommands(lines, command, "    ", name)
 
     table.insert(lines, "    if (( compstate[nmatches] == matches_before )); then")
     table.insert(lines, "        _files")

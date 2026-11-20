@@ -9,6 +9,9 @@ validation, default values, and casting.
 
 const TypeUtils = require("../Source/Commandline/Helpers/TypeUtils")
 
+const Testable = require("@devpackages/Testable")
+const describe, expect, it = Testable.describe, Testable.expect, Testable.it
+
 return function()
     describe("TypeUtils.default", function()
         it("should return value when it matches defaultValue type", function()

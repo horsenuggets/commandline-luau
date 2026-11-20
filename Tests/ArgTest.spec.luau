@@ -8,6 +8,9 @@ Tests for the Arg class, covering creation, type validation, and default value h
 
 const Arg = require("../Source/Commandline/Arg")
 
+const Testable = require("@devpackages/Testable")
+const describe, expect, it = Testable.describe, Testable.expect, Testable.it
+
 return function()
     describe("Arg.new", function()
         it("should create a basic Arg with default values", function()

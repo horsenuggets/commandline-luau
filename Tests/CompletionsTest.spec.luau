@@ -9,6 +9,8 @@ definitions.
 --]]
 
 const Commandline = require("@commandline")
+const fs = require("@lune/fs")
+const process = require("@lune/process")
 
 const Command = Commandline.Command
 const Completions = Commandline.Completions
@@ -68,6 +70,69 @@ const function makeCommandWithSubcommands(): any
         },
     })
 end
+
+-- Autoload the generated file inside an actual completion widget, without reading or
+-- writing a user's shell configuration. The bounded loop also handles startup failures.
+const function completeZsh(command: any, input: string): string
+    const directory = `{tostring(project)}/Build/ZshCompletionTests/{os.time()}-{math.random(1, 1e9)}`
+    fs.writeDir(directory)
+    fs.writeFile(`{directory}/_{command.Name}`, Completions.zsh(command))
+    const ok, result = pcall(process.exec, "zsh", {
+        "-f",
+        "-c",
+        [=[
+            zmodload zsh/zpty
+            zmodload zsh/zselect
+            child='
+                fpath=( "$TEST_FPATH" $fpath )
+                autoload -Uz compinit
+                compinit -D
+                bindkey -e
+                compdef _normal -value-
+                _capture() {
+                    _main_complete
+                    print -r -- "MATCHES=$compstate[nmatches]"
+                }
+                zle -C capture complete-word _capture
+                bindkey "^I" capture
+                print -r -- READY
+                vared -c input
+                print -r -- "INSERTED=$input"
+                print -r -- FINISHED
+            '
+            zpty -b completion zsh -f -i -c "${(q)child}"
+            output=''
+            sent=0
+            for (( attempt=0; attempt < 1000; attempt++ )); do
+                while zpty -r completion chunk; do
+                    output+=$chunk
+                done
+                if [[ $output == *READY* && $sent == 0 ]]; then
+                    zpty -w -n completion "$TEST_INPUT"$'\t\n'
+                    sent=1
+                fi
+                [[ $output == *FINISHED* ]] && break
+                zselect -t 1
+            done
+            zpty -d completion
+            print -r -- "$output"
+            [[ $output == *FINISHED* ]]
+        ]=],
+    }, {
+        env = {
+            TERM = "xterm-256color",
+            TEST_FPATH = directory,
+            TEST_INPUT = input,
+        },
+    })
+    fs.removeDir(directory)
+    assert(ok, tostring(result))
+    assert(result.ok, result.stdout .. result.stderr)
+    return result.stdout
+end
+
+const Testable = require("@devpackages/Testable")
+const describe, expect, it = Testable.describe, Testable.expect, Testable.it
 
 return function()
     describe("generate", function()
@@ -144,6 +209,83 @@ return function()
     end)
 
     describe("zsh", function()
+        it("should generate unpadded blue flag names and gray italic descriptions", function()
+            const output = Completions.zsh(makeSimpleCommand())
+            expect(
+                string.find(
+                    output,
+                    "flag_long_displays+=($'\\e[94m--help\\e[0m \\e[90m-- \\e[3mShow help message.\\e[0m')",
+                    1,
+                    true
+                )
+            ).to.be.ok()
+            expect(
+                string.find(
+                    output,
+                    "flag_pair_displays+=($'\\e[94m-h\\e[90m, \\e[94m--help\\e[0m \\e[90m-- \\e[3mShow help message.\\e[0m')",
+                    1,
+                    true
+                )
+            ).to.be.ok()
+            expect(string.find(output, "[[ $PREFIX == --* || -z $flag_shorts[index] ]]", 1, true)).to.be.ok()
+            expect(string.find(output, "compadd -V unsorted -l -d displays -a candidates", 1, true)).to.be.ok()
+            expect(string.find(output, "zstyle", 1, true)).to.equal(nil)
+        end)
+
+        it("should escape ANSI-C display strings without interpreting description escapes", function()
+            const command = Command.new({
+                Name = "mytool",
+                Description = "Test tool.",
+                Subcommands = {
+                    Command.new({
+                        Name = "open",
+                        Description = [[It's a "quoted" C:\folder.]],
+                        Flags = { Flag.new({ Name = "output", Description = [[It's a "quoted" C:\folder.]] }) },
+                        Impl = function() end,
+                    }),
+                },
+            })
+            const output = Completions.zsh(command)
+            expect(string.find(output, [[It\'s a "quoted" C:\\folder.]], 1, true)).to.be.ok()
+            expect(output).to.equal(Completions.zsh(command))
+        end)
+
+        const available, probe = pcall(process.exec, "zsh", { "-f", "-c", "zmodload zsh/zpty" })
+        const shellTest = if available and probe.ok then it else Testable.itSKIP
+        for _, case in
+            {
+                { Input = "mytool ", Inserted = "mytool ", Matches = 3 },
+                { Input = "mytool bu", Inserted = "mytool build", Matches = 1 },
+                { Input = "mytool --", Inserted = "mytool --", Matches = 2 },
+                { Input = "mytool build -", Inserted = "mytool build -", Matches = 3 },
+                { Input = "mytool build --", Inserted = "mytool build --", Matches = 3 },
+                { Input = "mytool build -r -", Inserted = "mytool build -r -", Matches = 2 },
+                { Input = "mytool build --release --", Inserted = "mytool build --release --", Matches = 2 },
+                { Input = "mytool build --ta", Inserted = "mytool build --target", Matches = 1 },
+                { Input = "mytool build --target -", Inserted = "mytool build --target -", Matches = 0 },
+                { Input = "mytool build -t Sour", Inserted = "mytool build -t Source", Matches = 1 },
+                { Input = "mytool build --target Sour", Inserted = "mytool build --target Source", Matches = 1 },
+                { Input = "mytool unknown Sour", Inserted = "mytool unknown Source", Matches = 1 },
+            }
+        do
+            shellTest(`should complete "{case.Input}" using zsh's real parser`, function()
+                const output = completeZsh(makeCommandWithSubcommands(), case.Input)
+                assert(string.find(output, `MATCHES={case.Matches}`, 1, true), output)
+                assert(string.find(output, `INSERTED={case.Inserted}\r\n`, 1, true), output)
+            end)
+        end
+
+        shellTest("should isolate flags at deeply nested command levels", function()
+            const command = Command.new({
+                Name = "outer",
+                Description = "Nested test tool.",
+                Subcommands = { makeCommandWithSubcommands() },
+            })
+            const output = completeZsh(command, "outer mytool build --ta")
+            assert(string.find(output, "MATCHES=1", 1, true), output)
+            assert(string.find(output, "INSERTED=outer mytool build --target\r\n", 1, true), output)
+        end)
+
         it("should support path values for long-only typed options", function()
             const cmd = Command.new({
                 Name = "mytool",
@@ -198,9 +340,23 @@ return function()
         it("should include subcommand descriptions", function()
             const cmd = makeCommandWithSubcommands()
             const output = Completions.zsh(cmd)
-            expect(string.find(output, "build:Build the project")).to.be.ok()
-            expect(string.find(output, "run:Run the project")).to.be.ok()
-            expect(string.find(output, "init:Initialize a new project")).to.be.ok()
+            expect(string.find(output, "-- \\e[3mBuild the project.", 1, true)).to.be.ok()
+            expect(string.find(output, "-- \\e[3mRun the project.", 1, true)).to.be.ok()
+            expect(string.find(output, "-- \\e[3mInitialize a new project.", 1, true)).to.be.ok()
+        end)
+
+        it("should display subcommands without a leading marker", function()
+            const output = Completions.zsh(makeCommandWithSubcommands())
+            expect(
+                string.find(
+                    output,
+                    "display_cmds+=($'\\e[94mbuild\\e[0m \\e[90m-- \\e[3mBuild the project.\\e[0m')",
+                    1,
+                    true
+                )
+            ).to.be.ok()
+            expect(string.find(output, "\\e[90m> ", 1, true)).to.equal(nil)
+            expect(string.find(output, "cmd_names+=('build')", 1, true)).to.be.ok()
         end)
 
         it("should use compadd for subcommand completion", function()

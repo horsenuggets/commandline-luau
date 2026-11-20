@@ -8,6 +8,9 @@ Tests for the Flag class, covering creation, type validation, and default value 
 
 const Flag = require("../Source/Commandline/Flag")
 
+const Testable = require("@devpackages/Testable")
+const describe, expect, it = Testable.describe, Testable.expect, Testable.it
+
 return function()
     describe("Flag.new", function()
         it("should create a basic Flag with default values", function()
