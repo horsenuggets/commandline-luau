@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.6
+
+- Matched Zsh completion colors and compact spacing to CLI help output.
+- Paired shorthand and long flag names for single-dash completion.
+- Showed only long flag names for double-dash completion.
+- Preserved nested flag parsing, exclusions, value completion, and native path fallback.
+- Updated shared CI tooling, test dependencies, and published development tools.
+
 ## 0.2.5
 
 - Standardized release asset architecture suffixes as x64 and arm64.
