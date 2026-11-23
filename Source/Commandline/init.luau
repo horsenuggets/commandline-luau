@@ -4,7 +4,8 @@ Commandline
 
 Main entry point for the commandline library. Provides registration and execution of
 commands, along with exports of Arg, Command, and Flag classes for building command-line
-interfaces.
+interfaces, and the Terminal class with its Path, Style, and Timestamp helpers for styled,
+timestamped output.
 
 --]]
 
@@ -12,7 +13,11 @@ const Arg = require("@self/Arg")
 const Command = require("@self/Command")
 const Completions = require("@self/Completions")
 const Flag = require("@self/Flag")
+const Path = require("@self/Terminal/Path")
 const StringUtils = require("@self/Helpers/StringUtils")
+const Style = require("@self/Terminal/Style")
+const Terminal = require("@self/Terminal")
+const Timestamp = require("@self/Terminal/Timestamp")
 const Toolkit = require("@self/Toolkit")
 const t = require("@packages/t")
 
@@ -22,6 +27,10 @@ const Commandline = {
     Command = Command,
     Completions = Completions,
     Flag = Flag,
+    Path = Path,
+    Style = Style,
+    Terminal = Terminal,
+    Timestamp = Timestamp,
     Toolkit = Toolkit,
 
     -- Private static properties

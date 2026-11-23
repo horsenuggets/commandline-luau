@@ -109,3 +109,57 @@ local app = Commandline.Command.new({
 ## Help
 
 A `--help` / `-h` flag is automatically added to all commands.
+
+## Terminal Output
+
+`Commandline.Terminal` writes styled lines with an optional timestamp prefix. Each kind of
+text has a helper that paints it from the theme...
+
+```luau
+local terminal = Commandline.Terminal.new({ Timestamps = "stopwatch" })
+Commandline.Terminal.setDefault(terminal)
+
+terminal:Print(terminal:Heading("Building my-app..."))
+terminal:Print(terminal:Step(1, 3, `Building {terminal:Path("C:\\Users\\me\\My Place.rbxl")}...`))
+terminal:Print(`Listening on {terminal:Address("localhost:34872")}.`)
+terminal:Print(`Downloaded {terminal:Count(15)} packages!`)
+terminal:Print(terminal:Success("Build completed successfully!"))
+```
+
+`Path` shows every path with forward slashes, collapses the home folder to `~`, ends
+directories with `/` when given `{ Directory = true }`, and shows spaces as `·`. Place and
+model files use the Roblox path style (cyan bold), and other paths are gray.
+
+**Timestamps**
+
+Pass `Timestamps` as a setting string or a `Commandline.Timestamp` config...
+
+- `disabled` → No prefix (the default).
+- `stopwatch` → Time since the terminal was created, like `[00:01.234]`.
+- `utc` → UTC wall clock time, like `[19:05:09.042]`.
+- `local` → Local wall clock time.
+- `utc+9`, `utc-05:30` → Wall clock time at a fixed offset.
+
+Setting the `COMMANDLINE_TIMESTAMPS` environment variable to any of these overrides the
+app's choice, and `NO_COLOR` turns color off. `terminal:Stream()` returns a writer that
+splits streamed output, such as a child process's standard output, into timestamped lines.
+
+**Themes**
+
+Every theme entry (`Address`, `Count`, `Error`, `Heading`, `Identifier`, `Path`,
+`RobloxPath`, `StepBracket`, `StepCurrent`, `StepTotal`, `Success`, `TimestampBracket`,
+`TimestampFaint`, `TimestampText`, `Url`, and `Warning`) can be overridden with a spec of
+`Bold`, `Color`, `Dim`, `Italic`, and `Underline`. Colors are names like `cyanBright` or
+hex values like `#96cc22`...
+
+```luau
+local terminal = Commandline.Terminal.new({
+    Theme = {
+        Heading = { Bold = true, Color = "magentaBright" },
+        Path = { Color = "#8a8a8a", Italic = true },
+    },
+})
+```
+
+Library code such as `Toolkit` prints through `Commandline.Terminal.default()`, so an app
+that calls `setDefault` at startup gets the same timestamps and theme everywhere.
