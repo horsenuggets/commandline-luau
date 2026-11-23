@@ -141,8 +141,10 @@ Pass `Timestamps` as a setting string or a `Commandline.Timestamp` config...
 - `utc+9`, `utc-05:30` → Wall clock time at a fixed offset.
 
 Setting the `COMMANDLINE_TIMESTAMPS` environment variable to any of these overrides the
-app's choice, and `NO_COLOR` turns color off. `terminal:Stream()` returns a writer that
-splits streamed output, such as a child process's standard output, into timestamped lines.
+app's choice, and `NO_COLOR` turns color off. Lines printed to a terminal window wrap at
+word boundaries, with continuation lines aligned after the timestamp. Pass `Columns` to
+choose a width, or `0` to never wrap. `terminal:Stream()` returns a writer that splits
+streamed output, such as a child process's standard output, into timestamped lines.
 
 **Themes**
 
