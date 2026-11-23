@@ -110,6 +110,8 @@ return function()
             const terminal = harness({ Color = false, Home = "C:\\Users\\user" }).Terminal
             expect(terminal:Path("C:\\Users\\user\\My Games\\Place.rbxl")).to.equal("~/My·Games/Place.rbxl")
             expect(terminal:Path("C:\\Users\\user\\.ae", { Directory = true })).to.equal("~/.ae/")
+            expect(terminal:Path("/home/demo/x", { Home = "/home/demo" })).to.equal("~/x")
+            expect(terminal:Path("C:\\Users\\user\\x", { Home = "" })).to.equal("C:/Users/user/x")
 
             const colored = harness({ Color = true, Home = "/Users/user" }).Terminal
             const roblox = colored:Path("/tmp/Place.rbxl")

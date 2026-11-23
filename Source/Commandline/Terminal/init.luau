@@ -39,6 +39,7 @@ export type Config = {
 
 export type PathOptions = {
     Directory: boolean?,
+    Home: string?,
 }
 
 export type Stream = {
@@ -208,14 +209,21 @@ function Terminal.Identifier(self: Terminal, text: string): string
     return self:Paint("Identifier", text)
 end
 
--- Paints a filesystem path in its display form. Place and model files use the Roblox
--- path style, and every other path uses the plain path style.
+--[[
+    Paints a filesystem path in its display form. Place and model files use the Roblox
+    path style, and every other path uses the plain path style. Pass Directory to end the
+    path with a slash, and Home to collapse a different folder than the terminal's own.
+]]
 function Terminal.Path(self: Terminal, path: string, options: PathOptions?): string
     assert(t.string(path))
-    assert(t.optional(t.strictInterface({ Directory = t.optional(t.boolean) }))(options))
+    assert(t.optional(t.strictInterface({
+        Directory = t.optional(t.boolean),
+        Home = t.optional(t.string),
+    }))(options))
 
     const directory = options ~= nil and options.Directory == true
-    const display = Path.display(path, self.Home, directory)
+    const home = if options ~= nil and options.Home ~= nil then options.Home else self.Home
+    const display = Path.display(path, home, directory)
     const key = if not directory and Path.isRobloxFile(display) then "RobloxPath" else "Path"
     return Style.paintPath((self.Theme :: any)[key], display, self.Color)
 end
