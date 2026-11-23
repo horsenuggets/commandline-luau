@@ -4,7 +4,8 @@ Terminal
 
 Writes styled, optionally timestamped lines for a CLI. Paints paths, counts, headings,
 steps, and other kinds of text from a customizable theme, and prefixes every line,
-including streamed child process output, with the configured timestamp. The
+including streamed child process output, with the configured timestamp. Lines written to
+a terminal window wrap at word boundaries, aligned after the timestamp. The
 COMMANDLINE_TIMESTAMPS environment variable overrides the app's timestamp setting, and
 NO_COLOR turns color off.
 
@@ -14,9 +15,16 @@ const DateTime = require("@lune/datetime")
 const Path = require("@self/Path")
 const Style = require("@self/Style")
 const Timestamp = require("@self/Timestamp")
+const Wrap = require("@self/Wrap")
 const process = require("@lune/process")
 const stdio = require("@lune/stdio")
 const t = require("@packages/t")
+
+-- Each command prints the window width on standard error only when standard output is a
+-- terminal, so piped and redirected output is never wrapped.
+const UNIX_COLUMNS_SCRIPT = "test -t 1 && stty size </dev/tty >&2"
+const WINDOWS_COLUMNS_SCRIPT =
+    "if (-not [Console]::IsOutputRedirected) { [Console]::Error.Write([Console]::WindowWidth) }"
 
 const TIMESTAMPS_VARIABLE = "COMMANDLINE_TIMESTAMPS"
 
@@ -29,6 +37,7 @@ export type Clock = {
 export type Config = {
     Clock: Clock?,
     Color: boolean?,
+    Columns: number?,
     Env: { [string]: string? }?,
     Home: string?,
     Theme: Style.ThemeOverrides?,
@@ -53,8 +62,10 @@ export type Terminal = {
     new: (config: Config?) -> Terminal,
     default: () -> Terminal,
     setDefault: (terminal: Terminal) -> (),
+    detectColumns: (os: string) -> number?,
     Address: (self: Terminal, address: string) -> string,
     Color: boolean,
+    Columns: (self: Terminal) -> number,
     Count: (self: Terminal, count: number | string) -> string,
     Error: (self: Terminal, text: string) -> string,
     Heading: (self: Terminal, text: string) -> string,
@@ -74,6 +85,7 @@ export type Terminal = {
     Url: (self: Terminal, url: string) -> string,
     Warning: (self: Terminal, text: string) -> string,
     _clock: Clock,
+    _columns: number?,
     _write: { [Target]: (string) -> () },
 }
 
@@ -84,6 +96,7 @@ const configCheck = t.optional(t.strictInterface({
         UnixMillis = t.callback,
     })),
     Color = t.optional(t.boolean),
+    Columns = t.optional(t.numberMin(0)),
     Env = t.optional(t.table),
     Home = t.optional(t.string),
     Theme = t.optional(t.table),
@@ -139,6 +152,8 @@ end
 
     > Clock - Time sources, which tests replace (system clocks)
     > Color - Whether to emit ANSI styles (on unless NO_COLOR is set)
+    > Columns - Width to wrap lines at, or 0 to never wrap (the window width when writing
+    >   to a terminal window, otherwise 0)
     > Env - Environment variables to read (the process environment)
     > Home - The home folder that paths collapse to "~" (the OS home folder)
     > Theme - Style overrides keyed by theme entry (the default theme)
@@ -157,6 +172,8 @@ function Terminal.new(config: Config?): Terminal
         Theme = Style.theme(options.Theme),
         Timestamps = resolveTimestamps(options.Timestamps, env),
         _clock = options.Clock or systemClock(),
+        -- Custom sinks are not a terminal window, so they only wrap when asked to.
+        _columns = options.Columns or if options.Write or options.WriteError then 0 else nil,
         _write = {
             Error = options.WriteError or stdio.ewrite,
             Output = options.Write or stdio.write,
@@ -279,14 +296,52 @@ function Terminal.Prefix(self: Terminal): string
     )}{Style.paint(bracket, "]", self.Color)} `
 end
 
+--[[
+    Returns the width of the terminal window that standard output is writing to, or nil
+    when it is piped, redirected, or the width cannot be read. Runs a short command, so
+    terminals call it once and keep the result.
+]]
+function Terminal.detectColumns(os: string): number?
+    assert(t.string(os))
+
+    const windows = os == "windows"
+    const program = if windows then "powershell" else "sh"
+    const arguments = if windows
+        then { "-NoProfile", "-NonInteractive", "-Command", WINDOWS_COLUMNS_SCRIPT }
+        else { "-c", UNIX_COLUMNS_SCRIPT }
+    const spawned, result = pcall(process.exec, program, arguments, { stdio = { stdout = "forward" } })
+    if not spawned or not result.ok then
+        return nil
+    end
+    -- "stty size" prints rows before columns, and PowerShell prints only columns.
+    const columns = tonumber(string.match(result.stderr, "(%d+)%s*$"))
+    return if columns and columns > 0 then columns else nil
+end
+
+-- Returns the width lines wrap at, or 0 when they never wrap.
+function Terminal.Columns(self: Terminal): number
+    if self._columns == nil then
+        self._columns = Terminal.detectColumns(process.os) or 0
+    end
+    return self._columns :: number
+end
+
 const function writeLines(self: Terminal, target: Target, text: string?)
     assert(t.optional(t.string)(text))
 
+    const columns = self:Columns()
     const lines = {}
     for line in string.gmatch(`{text or ""}\n`, "([^\n]*)\n") do
         const trimmed = string.gsub(line, "\r$", "")
         -- Blank lines separate output, so they stay blank instead of showing a timestamp.
-        table.insert(lines, if trimmed == "" then "\n" else `{self:Prefix()}{trimmed}\n`)
+        if trimmed == "" then
+            table.insert(lines, "\n")
+            continue
+        end
+        const prefix = self:Prefix()
+        const full = `{prefix}{trimmed}`
+        const wrapped = if columns > 0 then Wrap.line(full, columns, string.rep(" ", Wrap.width(prefix))) else full
+        table.insert(lines, `{wrapped}\n`)
     end
     self._write[target](table.concat(lines))
 end

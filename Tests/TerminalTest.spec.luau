@@ -176,6 +176,23 @@ return function()
             expect(table.concat(h.Output)).to.equal("\n[19:05:09.042] A.\n\n[19:05:09.042] B.\n")
         end)
 
+        it("should wrap long lines at words, aligned after the timestamp", function()
+            const h = harness({ Color = false, Columns = 40, Timestamps = "stopwatch" })
+            h.Advance(1.5)
+            h.Terminal:Print("Visit http://localhost:52876/ in your browser.")
+            expect(table.concat(h.Output)).to.equal(
+                "[00:01.500] Visit\n            http://localhost:52876/ in\n            your browser.\n"
+            )
+        end)
+
+        it("should only wrap custom sinks when given a width", function()
+            const h = harness({ Color = false })
+            expect(h.Terminal:Columns()).to.equal(0)
+            h.Terminal:Print(string.rep("word ", 100))
+            expect(#h.Output).to.equal(1)
+            expect(string.find(h.Output[1], "\n", 1, true)).to.equal(#h.Output[1])
+        end)
+
         it("should color the faint lead separately from the counting digits", function()
             const h = harness({ Color = true, Timestamps = "stopwatch" })
             h.Advance(12.345)
