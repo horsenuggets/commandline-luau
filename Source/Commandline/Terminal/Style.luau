@@ -69,22 +69,28 @@ export type Theme = {
 
 export type ThemeOverrides = { [string]: Spec }
 
+-- Two grays carry all secondary text. Muted text (addresses, links, paths, names, step
+-- brackets, and counting timestamp digits) stays readable, and faint text (timestamp
+-- brackets and leading zeros) recedes behind it.
+const FAINT_GRAY = "#5a5a5a"
+const MUTED_GRAY = "#a8a8a8"
+
 const DEFAULT_THEME: Theme = table.freeze({
-    Address = table.freeze({ Color = "gray" }),
+    Address = table.freeze({ Color = MUTED_GRAY }),
     Count = table.freeze({ Bold = true, Color = "yellowBright" }),
     Error = table.freeze({ Color = "red" }),
     Heading = table.freeze({ Bold = true, Color = "blueBright" }),
-    Identifier = table.freeze({ Color = "gray" }),
-    Path = table.freeze({ Color = "gray" }),
+    Identifier = table.freeze({ Color = MUTED_GRAY }),
+    Path = table.freeze({ Color = MUTED_GRAY }),
     RobloxPath = table.freeze({ Bold = true, Color = "cyanBright" }),
-    StepBracket = table.freeze({}),
+    StepBracket = table.freeze({ Color = MUTED_GRAY }),
     StepCurrent = table.freeze({ Bold = true, Color = "yellowBright" }),
     StepTotal = table.freeze({}),
     Success = table.freeze({ Bold = true, Color = "greenBright" }),
-    TimestampBracket = table.freeze({ Color = "#5a5a5a" }),
-    TimestampFaint = table.freeze({ Color = "#5a5a5a" }),
-    TimestampText = table.freeze({ Color = "#a8a8a8" }),
-    Url = table.freeze({ Color = "gray" }),
+    TimestampBracket = table.freeze({ Color = FAINT_GRAY }),
+    TimestampFaint = table.freeze({ Color = FAINT_GRAY }),
+    TimestampText = table.freeze({ Color = MUTED_GRAY }),
+    Url = table.freeze({ Color = MUTED_GRAY }),
     Warning = table.freeze({ Color = "yellow" }),
 }) :: any
 

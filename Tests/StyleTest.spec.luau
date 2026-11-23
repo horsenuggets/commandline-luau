@@ -88,6 +88,14 @@ return function()
                 true
             )
         end)
+
+        it("should share one muted gray across secondary text", function()
+            const theme = Style.DefaultTheme :: any
+            for _, key in { "Address", "Identifier", "Path", "StepBracket", "Url" } do
+                expect(theme[key].Color).to.equal(theme.TimestampText.Color)
+                expect(theme[key].Dim).to.equal(nil)
+            end
+        end)
     end)
 
     describe("Style.codes", function()
