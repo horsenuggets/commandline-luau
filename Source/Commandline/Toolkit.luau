@@ -14,6 +14,8 @@ const process = require("@lune/process")
 const t = require("@packages/t")
 
 const Completions = require("@self/Completions")
+const SelfUpdate = require("@self/SelfUpdate")
+const Terminal = require("@self/Terminal")
 
 const Toolkit = {}
 
@@ -91,14 +93,15 @@ function Toolkit.build(options: {
 
     const outputDir = options.OutputDir or "Build"
     const target = options.Target
+    const terminal = Terminal.default()
 
-    print()
-    print("Building " .. Chalk.bold(Chalk.blueBright(options.Name)) .. " executable...")
+    terminal:Print(terminal:Heading(`Building {options.Name}...`))
 
     -- Resolve entry point
     const entryPoint = options.EntryPoint
-    if not fs.isDir(entryPoint) and not fs.isFile(entryPoint) then
-        print(Chalk.red('Entry point "' .. entryPoint .. '" not found.'))
+    const entryIsDir = fs.isDir(entryPoint)
+    if not entryIsDir and not fs.isFile(entryPoint) then
+        terminal:Print(terminal:Error(`Entry point {terminal:Path(entryPoint)} not found.`))
         process.exit(1)
     end
 
@@ -137,11 +140,9 @@ function Toolkit.build(options: {
     if target then
         table.insert(args, "--target")
         table.insert(args, target)
-        print("Target is " .. Chalk.dim(target) .. ".")
-    else
-        print("Target is " .. Chalk.dim(process.os .. "-" .. process.arch) .. ".")
     end
-    print("Entry point is " .. Chalk.dim(entryPoint) .. ".")
+    terminal:Print(`Target is {terminal:Identifier(target or SelfUpdate.getPlatformSuffix())}.`)
+    terminal:Print(`Entry point is {terminal:Path(entryPoint, { Directory = entryIsDir })}.`)
 
     const result = process.exec("lune", args)
 
@@ -157,14 +158,13 @@ function Toolkit.build(options: {
         end
 
         if fs.isFile(outputFile) then
-            print("Output file is " .. Chalk.dim(outputFile) .. ".")
+            terminal:Print(`Output file is {terminal:Path(outputFile)}.`)
         end
 
-        print()
-        print(Chalk.bold(Chalk.greenBright("Build completed successfully!")))
+        terminal:Print(terminal:Success("Build completed successfully!"))
     else
-        print(Chalk.redBright("Build failed."))
-        print(result.stderr)
+        terminal:Print(terminal:Error("Build failed."))
+        terminal:Print(result.stderr)
         process.exit(1)
     end
 end
@@ -251,7 +251,8 @@ function Toolkit.installCompletions(options: {
     end
 
     fs.writeFile(completionFile, script)
-    print("Installed " .. shell .. " completions to " .. Chalk.dim(completionFile) .. ".")
+    const terminal = Terminal.default()
+    terminal:Print(`Installed {shell} completions to {terminal:Path(completionFile)}.`)
 
     -- Configure the shell to load completions
     const marker = "# Added by commandline-luau"
@@ -267,7 +268,7 @@ function Toolkit.installCompletions(options: {
         end
 
         if string.find(content, marker, 1, true) then
-            print(Chalk.dim("Shell config already configured."))
+            terminal:Print("Shell config already configured.")
             return
         end
 
@@ -281,8 +282,8 @@ function Toolkit.installCompletions(options: {
         content = content .. marker .. "\n" .. fPathLine .. "\n" .. compInitLine .. "\n"
 
         fs.writeFile(configPath, content)
-        print("Added completions to " .. Chalk.dim(configPath) .. ".")
-        print(Chalk.yellow("Restart your terminal to enable completions."))
+        terminal:Print(`Added completions to {terminal:Path(configPath)}.`)
+        terminal:Print(terminal:Warning("Restart your terminal to enable completions."))
     elseif shell == "powershell" or shell == "pwsh" then
         -- Find or create the PowerShell profile
         const profileDir = homeDir .. "/.config/powershell"
@@ -298,7 +299,7 @@ function Toolkit.installCompletions(options: {
         end
 
         if string.find(content, marker, 1, true) then
-            print(Chalk.dim("Shell config already configured."))
+            terminal:Print("Shell config already configured.")
             return
         end
 
@@ -314,16 +315,14 @@ function Toolkit.installCompletions(options: {
         content = content .. marker .. "\n" .. sourceLine .. "\n"
 
         fs.writeFile(profilePath, content)
-        print("Added completions to " .. Chalk.dim(profilePath) .. ".")
-        print(Chalk.yellow("Restart PowerShell to enable completions."))
+        terminal:Print(`Added completions to {terminal:Path(profilePath)}.`)
+        terminal:Print(terminal:Warning("Restart PowerShell to enable completions."))
     end
 end
 
 ------------------------------------------------------------------------------------------
 -- Install and Update (Direct Binary Replacement)
 ------------------------------------------------------------------------------------------
-
-const SelfUpdate = require("@self/SelfUpdate")
 
 const installOptionsCheck = t.interface({
     Name = t.string,
