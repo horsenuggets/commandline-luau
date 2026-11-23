@@ -437,7 +437,8 @@ function Toolkit.installCommand(options: {
                 .. ";' + $p, 'User') }"
             const result = process.exec("powershell", { "-Command", psCmd })
             if result.ok then
-                print(`Added {Chalk.dim(BIN_DIR)} to user PATH.`)
+                const terminal = Terminal.default()
+                terminal:Print(`Added {terminal:Path(BIN_DIR, { Directory = true })} to user PATH.`)
             end
             return
         end
@@ -451,7 +452,10 @@ function Toolkit.installCommand(options: {
                 end
                 content ..= BIN_DIR .. "\n"
                 fs.writeFile(XSH_PATH_FILE, content)
-                print(`Added {Chalk.dim(BIN_DIR)} to {Chalk.dim("~/.path")}.`)
+                const terminal = Terminal.default()
+                terminal:Print(
+                    `Added {terminal:Path(BIN_DIR, { Directory = true })} to {terminal:Path(XSH_PATH_FILE)}.`
+                )
             end
             return
         end
@@ -467,7 +471,8 @@ function Toolkit.installCommand(options: {
                     end
                     content ..= "\n" .. PATH_EXPORT_COMMENT .. "\n" .. PATH_EXPORT_LINE .. "\n"
                     fs.writeFile(configPath, content)
-                    print(`Added {Chalk.dim(name)} to {Chalk.dim("~/" .. config.file)}.`)
+                    const terminal = Terminal.default()
+                    terminal:Print(`Added {terminal:Identifier(name)} to {terminal:Path(configPath)}.`)
                 end
             end
         end
@@ -477,7 +482,7 @@ function Toolkit.installCommand(options: {
         Name = "install",
         Description = `Install {name} CLI to ~/{installDir} and add to PATH.`,
         Impl = function()
-            print(`Installing {Chalk.bold(Chalk.blueBright(name))} {Chalk.dim(version)}...`)
+            print(`Installing {Chalk.bold(Chalk.blueBright(name))} {Terminal.default():Identifier(version)}...`)
             print()
 
             -- Create directory structure
@@ -499,7 +504,8 @@ function Toolkit.installCommand(options: {
                     sourcePath = currentExe,
                     targetPath = binaryPath,
                 })
-                print(`Copied executable to {Chalk.dim(binaryPath)}.`)
+                const terminal = Terminal.default()
+                terminal:Print(`Copied executable to {terminal:Path(binaryPath)}.`)
             else
                 -- Download from GitHub releases
                 print("Downloading binary...")
@@ -627,7 +633,11 @@ function Toolkit.updateCommand(options: {
                 return
             end
 
-            print(`Updating from {Chalk.dim(currentVersion)} to {Chalk.bold(Chalk.blueBright(newVersion))}...`)
+            print(
+                `Updating from {Terminal.default():Identifier(currentVersion)} to {Chalk.bold(
+                    Chalk.blueBright(newVersion)
+                )}...`
+            )
 
             -- Find download URL for current platform
             const platformSuffix = SelfUpdate.getPlatformSuffix()
