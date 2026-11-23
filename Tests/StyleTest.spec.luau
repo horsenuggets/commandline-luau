@@ -91,9 +91,14 @@ return function()
 
         it("should share one muted gray across secondary text", function()
             const theme = Style.DefaultTheme :: any
-            for _, key in { "Address", "Identifier", "Path", "StepBracket", "Url" } do
+            for _, key in { "Address", "Identifier", "Path", "StepBracket", "StepTotal", "Url" } do
                 expect(theme[key].Color).to.equal(theme.TimestampText.Color)
-                expect(theme[key].Dim).to.equal(nil)
+            end
+        end)
+
+        it("should never rely on dim text in the default theme", function()
+            for _, spec in Style.DefaultTheme :: any do
+                expect(spec.Dim).to.equal(nil)
             end
         end)
     end)
