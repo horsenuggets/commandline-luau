@@ -129,6 +129,32 @@ return function()
         it("should return plain text when color is off or the text is empty", function()
             expect(Style.paint({ Bold = true }, "Done.", false)).to.equal("Done.")
             expect(Style.paint({ Bold = true }, "", true)).to.equal("")
+            expect(Style.paint({}, "Done.", true)).to.equal("Done.")
+        end)
+
+        it("should keep its own style after text painted inside it ends", function()
+            const inner = Style.paint({ Color = "gray" }, "~/repo/", true)
+            const outer = Style.paint({ Color = "yellow" }, `Cannot read {inner} today.`, true)
+            expect(outer).to.equal(`{ESCAPE}33mCannot read {ESCAPE}90m~/repo/{ESCAPE}39m{ESCAPE}33m today.{ESCAPE}39m`)
+        end)
+
+        it("should keep a nested path's dot in the path's color", function()
+            const path = Style.paintPath({ Bold = true, Color = "cyanBright" }, "My Place.rbxl", true)
+            const outer = Style.paint({ Color = "yellow" }, `Open {path}.`, true)
+            expect(outer).to.equal(
+                `{ESCAPE}33mOpen {ESCAPE}1;96mMy{ESCAPE}22;96m·{ESCAPE}1mPlace.rbxl{ESCAPE}22;39m{ESCAPE}33m.{ESCAPE}39m`
+            )
+        end)
+    end)
+
+    describe("Style.isClosing", function()
+        it("should only accept codes that turn attributes off", function()
+            for _, parameters in { "", "0", "22", "22;39", "23;24;49" } do
+                expect(Style.isClosing(parameters)).to.equal(true)
+            end
+            for _, parameters in { "1", "22;96", "38;2;1;2;3", "39;1" } do
+                expect(Style.isClosing(parameters)).to.equal(false)
+            end
         end)
     end)
 
@@ -144,7 +170,7 @@ return function()
 
         it("should never make the dot bold", function()
             const painted = Style.paintPath({ Bold = true, Color = "cyanBright" }, "a b", true)
-            expect(painted).to.equal(`{ESCAPE}1;96ma{ESCAPE}22m·{ESCAPE}1mb{ESCAPE}22;39m`)
+            expect(painted).to.equal(`{ESCAPE}1;96ma{ESCAPE}22;96m·{ESCAPE}1mb{ESCAPE}22;39m`)
         end)
 
         it("should keep dim text dim around the dot", function()

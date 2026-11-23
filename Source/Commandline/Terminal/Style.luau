@@ -10,6 +10,14 @@ overridden. Contains no I/O, so callers decide whether color is enabled.
 
 const t = require("@packages/t")
 
+const CLOSING_PARAMETERS = {
+    ["0"] = true,
+    ["22"] = true,
+    ["23"] = true,
+    ["24"] = true,
+    ["39"] = true,
+    ["49"] = true,
+}
 const ESCAPE = "\u{1b}["
 const NAMED_COLORS = {
     black = 30,
@@ -184,7 +192,32 @@ function Style.paint(spec: Spec, text: string, color: boolean): string
         return text
     end
     const opening, closing = Style.codes(spec)
-    return `{opening}{text}{closing}`
+    if opening == "" then
+        return text
+    end
+    -- Text painted inside this text ends with its own closing codes, which would also end
+    -- this spec's color or weight. Reopening this spec after each one keeps it going.
+    const nested = string.gsub(text, "\u{1b}%[([%d;]*)m", function(parameters: string)
+        if Style.isClosing(parameters) then
+            return `\u{1b}[{parameters}m{opening}`
+        end
+        return nil
+    end)
+    return `{opening}{nested}{closing}`
+end
+
+-- Returns true for escape parameters that only turn attributes off, such as "22;39".
+function Style.isClosing(parameters: string): boolean
+    assert(t.string(parameters))
+    if parameters == "" then
+        return true
+    end
+    for parameter in string.gmatch(parameters, "[^;]+") do
+        if not CLOSING_PARAMETERS[parameter] then
+            return false
+        end
+    end
+    return true
 end
 
 --[[
@@ -199,9 +232,19 @@ function Style.paintPath(spec: Spec, text: string, color: boolean): string
     if not color or not spec.Bold then
         return Style.paint(spec, (string.gsub(text, " ", PATH_SEPARATOR_DOT)), color)
     end
-    const unbold = if spec.Dim then `{ESCAPE}22;2m` else `{ESCAPE}22m`
-    const separated = string.gsub(text, " ", `{unbold}{PATH_SEPARATOR_DOT}{ESCAPE}1m`)
-    return Style.paint(spec, separated, color)
+    -- Built directly rather than through paint, which would reopen bold after the dot.
+    -- The unbold code restates the color, so text painted around the path never mistakes
+    -- it for a closing code and recolors the dot.
+    const opening, closing = Style.codes(spec)
+    const unbold = { "22" }
+    if spec.Dim then
+        table.insert(unbold, "2")
+    end
+    if spec.Color then
+        table.insert(unbold, Style.colorCode(spec.Color) :: string)
+    end
+    const separated = string.gsub(text, " ", `{ESCAPE}{table.concat(unbold, ";")}m{PATH_SEPARATOR_DOT}{ESCAPE}1m`)
+    return `{opening}{separated}{closing}`
 end
 
 -- Removes ANSI escape sequences, which is useful for measuring or comparing output.
