@@ -22,10 +22,12 @@ const Toolkit = {}
 -- Validation types
 
 const buildOptionsCheck = t.interface({
+    DisplayName = t.optional(t.string),
     Name = t.string,
     EntryPoint = t.string,
     OutputDir = t.optional(t.string),
     Target = t.optional(t.string),
+    Terminal = t.optional(t.table),
 })
 
 const generateVersionCheck = t.interface({
@@ -77,25 +79,29 @@ end
     Builds a standalone executable from a Lune entry point.
 
     Options:
+    > DisplayName - Name shown in the build heading (default Name)
     > Name - Output binary name (e.g., "luauproject")
     > EntryPoint - Path to the entry point directory or file
     > OutputDir - Directory to write the binary (default "Build")
     > Target - Cross-compile target (e.g., "linux-x86_64"). Nil for current
     >   platform.
+    > Terminal - Terminal to print progress through (default Terminal.default())
 ]]
 function Toolkit.build(options: {
+    DisplayName: string?,
     Name: string,
     EntryPoint: string,
     OutputDir: string?,
     Target: string?,
+    Terminal: Terminal.Terminal?,
 })
     assert(buildOptionsCheck(options))
 
     const outputDir = options.OutputDir or "Build"
     const target = options.Target
-    const terminal = Terminal.default()
+    const terminal = options.Terminal or Terminal.default()
 
-    terminal:Print(terminal:Heading(`Building {options.Name}...`))
+    terminal:Print(terminal:Heading(`Building {options.DisplayName or options.Name}...`))
 
     -- Resolve entry point
     const entryPoint = options.EntryPoint

@@ -169,6 +169,38 @@ return function()
             cleanup(tempDir)
         end)
 
+        it("should print its messages through the given terminal", function()
+            const tempDir = createTempDir()
+            writeFile(tempDir, "src/init.luau", 'print("hello")\n')
+
+            local written = ""
+            const ok, problem = pcall(Toolkit.build, {
+                DisplayName = "test-cli",
+                Name = "test-binary",
+                EntryPoint = tempDir .. "/src",
+                OutputDir = tempDir .. "/out",
+                Terminal = Commandline.Terminal.new({
+                    Color = false,
+                    Env = {},
+                    Home = tempDir,
+                    Write = function(text)
+                        written ..= text
+                    end,
+                }),
+            })
+            cleanup(tempDir)
+            assert(ok, tostring(problem))
+
+            const executable = if process.os == "windows" then "test-binary.exe" else "test-binary"
+            expect(written).to.equal(
+                "Building test-cli...\n"
+                    .. `Target is {Toolkit._SelfUpdate.getPlatformSuffix()}.\n`
+                    .. "Entry point is ~/src/.\n"
+                    .. `Output file is ~/out/{executable}.\n`
+                    .. "Build completed successfully!\n"
+            )
+        end)
+
         it("should build a minimal executable from a file entry point", function()
             const tempDir = createTempDir()
             writeFile(tempDir, "main.luau", 'print("from-file")\n')
