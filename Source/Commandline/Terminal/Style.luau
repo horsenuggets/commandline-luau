@@ -73,9 +73,9 @@ const DEFAULT_THEME: Theme = table.freeze({
     StepCurrent = table.freeze({ Bold = true, Color = "yellowBright" }),
     StepTotal = table.freeze({}),
     Success = table.freeze({ Bold = true, Color = "greenBright" }),
-    TimestampBracket = table.freeze({ Color = "gray", Dim = true }),
-    TimestampFaint = table.freeze({ Color = "gray", Dim = true }),
-    TimestampText = table.freeze({ Color = "gray" }),
+    TimestampBracket = table.freeze({ Color = "#5a5a5a" }),
+    TimestampFaint = table.freeze({ Color = "#5a5a5a" }),
+    TimestampText = table.freeze({ Color = "#a8a8a8" }),
     Url = table.freeze({ Color = "gray" }),
     Warning = table.freeze({ Color = "yellow" }),
 }) :: any

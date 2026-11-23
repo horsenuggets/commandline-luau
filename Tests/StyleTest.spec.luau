@@ -74,6 +74,20 @@ return function()
                 expect(type(key)).to.equal("string")
             end
         end)
+
+        it("should show counting timestamp digits brighter than their faint lead", function()
+            const function brightness(color: string): number
+                const red, green, blue = string.match(color, "^#(%x%x)(%x%x)(%x%x)$")
+                assert(red and green and blue, `Expected a hex color, got "{color}".`)
+                return (tonumber(red, 16) :: number) + (tonumber(green, 16) :: number) + (tonumber(blue, 16) :: number)
+            end
+            const theme = Style.DefaultTheme
+            expect(theme.TimestampBracket.Color).to.equal(theme.TimestampFaint.Color)
+            expect(theme.TimestampFaint.Dim).to.equal(nil)
+            expect(brightness(theme.TimestampText.Color :: string) > brightness(theme.TimestampFaint.Color :: string)).to.equal(
+                true
+            )
+        end)
     end)
 
     describe("Style.codes", function()
