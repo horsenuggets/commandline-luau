@@ -32,7 +32,7 @@ type ProgressScenario = {
     PathFile: string?,
     ReleaseFailure: boolean?,
     ReleaseVersion: string?,
-    TargetVersion: string?,
+    TargetVersion: string?
 }
 
 -- Load the real command implementations with closed I/O boundaries. No missing mock can
@@ -58,7 +58,7 @@ const function runProgress(commandName: string, terminal: Terminal.Terminal, sce
                 return ""
             end,
             writeDir = function() end,
-            writeFile = function() end,
+            writeFile = function() end
         },
         ["@lune/net"] = {
             request = function(request)
@@ -71,10 +71,10 @@ const function runProgress(commandName: string, terminal: Terminal.Terminal, sce
                         then "not json"
                         else serde.encode("json", {
                             tag_name = scenario.ReleaseVersion or "2.0.0",
-                            assets = {},
-                        }),
+                            assets = {}
+                        })
                 }
-            end,
+            end
         },
         ["@lune/process"] = {
             env = { HOME = "/home/test", USERPROFILE = "/home/test" },
@@ -85,7 +85,7 @@ const function runProgress(commandName: string, terminal: Terminal.Terminal, sce
                 exitCode = code
                 error(exited, 0)
             end,
-            os = scenario.Os or "linux",
+            os = scenario.Os or "linux"
         },
         ["@lune/serde"] = serde,
         ["@self/Command"] = Command,
@@ -102,10 +102,10 @@ const function runProgress(commandName: string, terminal: Terminal.Terminal, sce
             getPlatformSuffix = function()
                 return "linux-x86_64"
             end,
-            replaceBinary = function() end,
+            replaceBinary = function() end
         },
         ["@self/Terminal"] = Terminal,
-        ["@self/Completions"] = Commandline.Completions,
+        ["@self/Completions"] = Commandline.Completions
     }
     const toolkit = luau.load(TOOLKIT_SOURCE, {
         environment = {
@@ -114,8 +114,8 @@ const function runProgress(commandName: string, terminal: Terminal.Terminal, sce
             end,
             require = function(path)
                 return assert(dependencies[path], `Unexpected dependency "{path}".`)
-            end,
-        },
+            end
+        }
     })()
     const options = { Name = "mytool", InstallDir = ".mytool", Version = "1.0.0", Repository = "example/mytool" }
     const command = if commandName == "install" then toolkit.installCommand(options) else toolkit.updateCommand(options)
@@ -181,7 +181,7 @@ const function expectProgress(
                     end,
                     UnixMillis = function()
                         return 0
-                    end,
+                    end
                 },
                 Color = color,
                 Columns = 0,
@@ -193,7 +193,7 @@ const function expectProgress(
                     Identifier = { Color = "yellow" },
                     Path = { Color = "blue" },
                     Success = { Color = "white" },
-                    Warning = { Color = "red" },
+                    Warning = { Color = "red" }
                 },
                 Timestamps = if timestamps then "stopwatch" else "off",
                 Write = function(text)
@@ -201,7 +201,7 @@ const function expectProgress(
                 end,
                 WriteError = function()
                     error("Progress unexpectedly changed its output stream.")
-                end,
+                end
             }
             const terminal = Terminal.new(config)
             const exitCode = runProgress(commandName, terminal, scenario)
@@ -227,7 +227,7 @@ return function()
             writeFile(tempDir, "VERSION", "1.2.3\n")
             Toolkit.generateVersion({
                 VersionFile = tempDir .. "/VERSION",
-                OutputPath = tempDir .. "/__VERSION__.luau",
+                OutputPath = tempDir .. "/__VERSION__.luau"
             })
             expect(fs.isFile(tempDir .. "/__VERSION__.luau")).to.equal(true)
             expect(readFile(tempDir, "__VERSION__.luau")).to.equal(
@@ -241,7 +241,7 @@ return function()
             writeFile(tempDir, "VERSION", "  0.5.10  \n")
             Toolkit.generateVersion({
                 VersionFile = tempDir .. "/VERSION",
-                OutputPath = tempDir .. "/__VERSION__.luau",
+                OutputPath = tempDir .. "/__VERSION__.luau"
             })
             expect(readFile(tempDir, "__VERSION__.luau")).to.equal(
                 '--[[\n\n__VERSION__\n\nAuto-generated version module.\n\n--]]\n\nreturn "0.5.10"\n'
@@ -254,7 +254,7 @@ return function()
             writeFile(tempDir, "VERSION", "2.0.0")
             Toolkit.generateVersion({
                 VersionFile = tempDir .. "/VERSION",
-                OutputPath = tempDir .. "/__VERSION__.luau",
+                OutputPath = tempDir .. "/__VERSION__.luau"
             })
             expect(readFile(tempDir, "__VERSION__.luau")).to.equal(
                 '--[[\n\n__VERSION__\n\nAuto-generated version module.\n\n--]]\n\nreturn "2.0.0"\n'
@@ -267,7 +267,7 @@ return function()
             writeFile(tempDir, "VERSION", "0.10.4-horse.10.0\n")
             Toolkit.generateVersion({
                 VersionFile = tempDir .. "/VERSION",
-                OutputPath = tempDir .. "/__VERSION__.luau",
+                OutputPath = tempDir .. "/__VERSION__.luau"
             })
             expect(readFile(tempDir, "__VERSION__.luau")).to.equal(
                 '--[[\n\n__VERSION__\n\nAuto-generated version module.\n\n--]]\n\nreturn "0.10.4-horse.10.0"\n'
@@ -280,7 +280,7 @@ return function()
             writeFile(tempDir, "VERSION", "1.0.0\n")
             Toolkit.generateVersion({
                 VersionFile = tempDir .. "/VERSION",
-                OutputPath = tempDir .. "/deep/nested/__VERSION__.luau",
+                OutputPath = tempDir .. "/deep/nested/__VERSION__.luau"
             })
             expect(fs.isFile(tempDir .. "/deep/nested/__VERSION__.luau")).to.equal(true)
             cleanup(tempDir)
@@ -295,7 +295,7 @@ return function()
             -- in cwd. We test the parameter directly instead.
             Toolkit.generateVersion({
                 VersionFile = tempDir .. "/VERSION",
-                OutputPath = tempDir .. "/out.luau",
+                OutputPath = tempDir .. "/out.luau"
             })
             expect(readFile(tempDir, "out.luau")).to.equal(
                 '--[[\n\n__VERSION__\n\nAuto-generated version module.\n\n--]]\n\nreturn "3.0.0"\n'
@@ -324,7 +324,7 @@ return function()
             Toolkit.build({
                 Name = "test-binary",
                 EntryPoint = tempDir .. "/src",
-                OutputDir = tempDir .. "/out",
+                OutputDir = tempDir .. "/out"
             })
 
             const binaryPath = tempDir .. "/out/test-binary"
@@ -353,8 +353,8 @@ return function()
                     Home = tempDir,
                     Write = function(text)
                         written ..= text
-                    end,
-                }),
+                    end
+                })
             })
             cleanup(tempDir)
             assert(ok, tostring(problem))
@@ -376,7 +376,7 @@ return function()
             Toolkit.build({
                 Name = "file-binary",
                 EntryPoint = tempDir .. "/main.luau",
-                OutputDir = tempDir .. "/out",
+                OutputDir = tempDir .. "/out"
             })
 
             const binaryPath = tempDir .. "/out/file-binary"
@@ -395,7 +395,7 @@ return function()
             Toolkit.build({
                 Name = "shebang-binary",
                 EntryPoint = tempDir .. "/main.luau",
-                OutputDir = tempDir .. "/out",
+                OutputDir = tempDir .. "/out"
             })
 
             const binaryPath = tempDir .. "/out/shebang-binary"
@@ -414,7 +414,7 @@ return function()
             Toolkit.build({
                 Name = "mkdir-test",
                 EntryPoint = tempDir .. "/src",
-                OutputDir = tempDir .. "/deep/nested/out",
+                OutputDir = tempDir .. "/deep/nested/out"
             })
 
             expect(fs.isDir(tempDir .. "/deep/nested/out")).to.equal(true)
@@ -430,7 +430,7 @@ return function()
             Toolkit.build({
                 Name = "old-binary",
                 EntryPoint = tempDir .. "/src",
-                OutputDir = tempDir .. "/out",
+                OutputDir = tempDir .. "/out"
             })
 
             const result = process.exec(tempDir .. "/out/old-binary", {})
@@ -447,7 +447,7 @@ return function()
                 Toolkit.build({
                     Name = "bad-build",
                     EntryPoint = tempDir .. "/bad.luau",
-                    OutputDir = tempDir .. "/out",
+                    OutputDir = tempDir .. "/out"
                 })
             end)
 
@@ -465,7 +465,7 @@ return function()
             {
                 { CurrentExecutable = true },
                 { PathFile = ".path" },
-                { Os = "windows" },
+                { Os = "windows" }
             }
         do
             it(
@@ -475,7 +475,7 @@ return function()
                         const suffix = if scenario.Os == "windows" then ".exe" else ""
                         const lines = {
                             terminal:Heading(`Installing mytool {terminal:Identifier("1.0.0")}...`),
-                            "",
+                            ""
                         }
                         if scenario.CurrentExecutable then
                             table.insert(
@@ -511,9 +511,9 @@ return function()
                 { Scenario = { InvalidRelease = true }, Message = "Failed to parse release data." },
                 {
                     Scenario = { MissingAsset = true },
-                    Message = 'Asset "mytool-linux-x86_64" not found in latest release.',
+                    Message = 'Asset "mytool-linux-x86_64" not found in latest release.'
                 },
-                { Scenario = { DownloadFailure = true }, Message = "Failed to download binary." },
+                { Scenario = { DownloadFailure = true }, Message = "Failed to download binary." }
             }
         do
             it(`should route install errors through the terminal when {failure.Message}`, function()
@@ -526,7 +526,7 @@ return function()
                         "",
                         "Downloading binary...",
                         terminal:Error(message),
-                        terminal:Error("Failed to install. Could not download binary."),
+                        terminal:Error("Failed to install. Could not download binary.")
                     }
                 end, 1)
             end)
@@ -540,7 +540,7 @@ return function()
                     terminal:Heading("Checking for updates to mytool..."),
                     `Updating from {terminal:Identifier("1.0.0")} to {terminal:Identifier("2.0.0")}...`,
                     "",
-                    terminal:Success(`Updated to {terminal:Identifier("2.0.0")}!`),
+                    terminal:Success(`Updated to {terminal:Identifier("2.0.0")}!`)
                 }
             end, nil)
         end)
@@ -549,7 +549,7 @@ return function()
             expectProgress("update", { ReleaseVersion = "1.0.0" }, function(terminal)
                 return {
                     terminal:Heading("Checking for updates to mytool..."),
-                    `Already on the latest version ({terminal:Identifier("1.0.0")}).`,
+                    `Already on the latest version ({terminal:Identifier("1.0.0")}).`
                 }
             end, nil)
         end)
@@ -561,7 +561,7 @@ return function()
                 { ReleaseFailure = true, TargetVersion = "missing" },
                 { MissingAsset = true },
                 { DownloadFailure = true },
-                {},
+                {}
             }
         do
             it(`should preserve update failure output and exits for {serde.encode("json", scenario)}`, function()
@@ -603,12 +603,12 @@ return function()
                     Command.new({
                         Name = "build",
                         Description = "Build something.",
-                        Impl = function() end,
+                        Impl = function() end
                     }),
                     Toolkit.completionsCommand(function()
                         return root
-                    end),
-                },
+                    end)
+                }
             })
 
             expect(#root._subcommands).to.equal(2)
@@ -627,14 +627,14 @@ return function()
                         Name = "run",
                         Description = "Run it.",
                         Flags = {
-                            Flag.new({ Name = "verbose", Shorthand = "v" }),
+                            Flag.new({ Name = "verbose", Shorthand = "v" })
                         },
-                        Impl = function() end,
+                        Impl = function() end
                     }),
                     Toolkit.completionsCommand(function()
                         return root
-                    end),
-                },
+                    end)
+                }
             })
 
             const names = {}

@@ -31,7 +31,7 @@ const TIMESTAMPS_VARIABLE = "COMMANDLINE_TIMESTAMPS"
 export type Clock = {
     Elapsed: () -> number,
     LocalOffsetMinutes: (unixMillis: number) -> number,
-    UnixMillis: () -> number,
+    UnixMillis: () -> number
 }
 
 export type Config = {
@@ -43,22 +43,22 @@ export type Config = {
     Theme: Style.ThemeOverrides?,
     Timestamps: (Timestamp.Config | string)?,
     Write: ((string) -> ())?,
-    WriteError: ((string) -> ())?,
+    WriteError: ((string) -> ())?
 }
 
 export type PathOptions = {
     Directory: boolean?,
-    Home: string?,
+    Home: string?
 }
 
 export type PrintOptions = {
     Timestamps: boolean?,
-    Wrap: boolean?,
+    Wrap: boolean?
 }
 
 export type Stream = {
     Flush: () -> (),
-    Write: (chunk: string) -> (),
+    Write: (chunk: string) -> ()
 }
 
 export type Target = "Error" | "Output"
@@ -92,14 +92,14 @@ export type Terminal = {
     Warning: (self: Terminal, text: string) -> string,
     _clock: Clock,
     _columns: number?,
-    _write: { [Target]: (string) -> () },
+    _write: { [Target]: (string) -> () }
 }
 
 const configCheck = t.optional(t.strictInterface({
     Clock = t.optional(t.interface({
         Elapsed = t.callback,
         LocalOffsetMinutes = t.callback,
-        UnixMillis = t.callback,
+        UnixMillis = t.callback
     })),
     Color = t.optional(t.boolean),
     Columns = t.optional(t.numberMin(0)),
@@ -108,7 +108,7 @@ const configCheck = t.optional(t.strictInterface({
     Theme = t.optional(t.table),
     Timestamps = t.optional(t.union(t.string, t.table)),
     Write = t.optional(t.callback),
-    WriteError = t.optional(t.callback),
+    WriteError = t.optional(t.callback)
 }))
 
 const Terminal = {}
@@ -133,7 +133,7 @@ const function systemClock(): Clock
         LocalOffsetMinutes = Terminal.localOffsetMinutes,
         UnixMillis = function()
             return DateTime.now().unixTimestampMillis
-        end,
+        end
     }
 end
 
@@ -185,8 +185,8 @@ function Terminal.new(config: Config?): Terminal
         _columns = options.Columns or if options.Write or options.WriteError then 0 else nil,
         _write = {
             Error = options.WriteError or stdio.ewrite,
-            Output = options.Write or stdio.write,
-        },
+            Output = options.Write or stdio.write
+        }
     }
     return setmetatable(self, Terminal) :: any
 end
@@ -244,7 +244,7 @@ function Terminal.Path(self: Terminal, path: string, options: PathOptions?): str
     assert(t.string(path))
     assert(t.optional(t.strictInterface({
         Directory = t.optional(t.boolean),
-        Home = t.optional(t.string),
+        Home = t.optional(t.string)
     }))(options))
 
     const directory = options ~= nil and options.Directory == true
@@ -293,7 +293,7 @@ function Terminal.Prefix(self: Terminal): string
     const faint, text = Timestamp.format(self.Timestamps, {
         ElapsedSeconds = self._clock.Elapsed(),
         LocalOffsetMinutes = if self.Timestamps.Mode == "Local" then self._clock.LocalOffsetMinutes(unixMillis) else 0,
-        UnixMillis = unixMillis,
+        UnixMillis = unixMillis
     })
     if faint == nil or text == nil then
         return ""
@@ -346,7 +346,7 @@ const function writeLines(
     assert(t.optional(t.string)(text))
     assert(t.optional(t.strictInterface({
         Timestamps = t.optional(t.boolean),
-        Wrap = t.optional(t.boolean),
+        Wrap = t.optional(t.boolean)
     }))(options))
 
     local activeStyle = previousStyle or ""
@@ -407,7 +407,7 @@ function Terminal.Stream(self: Terminal, target: Target?): Stream
                 activeStyle = writeLines(self, destination, string.sub(pending, 1, lastNewline - 1), activeStyle)
                 pending = string.sub(pending, lastNewline + 1)
             end
-        end,
+        end
     }
 end
 

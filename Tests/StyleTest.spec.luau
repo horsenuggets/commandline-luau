@@ -86,7 +86,7 @@ return function()
                     { Opacity = 0.25 },
                     { Color = "gray", Opacity = 0.25 },
                     { Color = "#12345", Opacity = 0.25 },
-                    { Color = "#a8a8a8", Opacity = "0.25" } :: any,
+                    { Color = "#a8a8a8", Opacity = "0.25" } :: any
                 }
             do
                 expect(Style.validate(spec)).to.equal(false)
@@ -134,7 +134,7 @@ return function()
                     "StepTotal",
                     "TimestampBracket",
                     "TimestampFaint",
-                    "Url",
+                    "Url"
                 }
             do
                 expect(theme[key].Color).to.equal(theme.TimestampText.Color)

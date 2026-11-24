@@ -41,7 +41,7 @@ return function()
     describe("Commandline.registerCommand", function()
         it("should register a valid command", function()
             const cmd = Commandline.Command.new({
-                Name = "test",
+                Name = "test"
             })
             Commandline.registerCommand(cmd)
             expect(Commandline._commands["test"]).to.equal(cmd)
@@ -87,7 +87,7 @@ return function()
                 Name = "test",
                 Impl = function()
                     executed = true
-                end,
+                end
             })
             Commandline.registerCommand(cmd)
             Commandline.execute("test")
@@ -99,11 +99,11 @@ return function()
             const cmd = Commandline.Command.new({
                 Name = "greet",
                 Args = {
-                    Commandline.Arg.new({ Name = "name" }),
+                    Commandline.Arg.new({ Name = "name" })
                 },
                 Impl = function(args)
                     receivedArgs = args
-                end,
+                end
             })
             Commandline.registerCommand(cmd)
             Commandline.execute("greet Alice")
@@ -115,11 +115,11 @@ return function()
             const cmd = Commandline.Command.new({
                 Name = "echo",
                 Args = {
-                    Commandline.Arg.new({ Name = "message" }),
+                    Commandline.Arg.new({ Name = "message" })
                 },
                 Impl = function(args)
                     receivedArgs = args
-                end,
+                end
             })
             Commandline.registerCommand(cmd)
             Commandline.execute('echo "Hello World"')
@@ -131,11 +131,11 @@ return function()
             const cmd = Commandline.Command.new({
                 Name = "build",
                 Flags = {
-                    Commandline.Flag.new({ Name = "verbose", Shorthand = "v" }),
+                    Commandline.Flag.new({ Name = "verbose", Shorthand = "v" })
                 },
                 Impl = function(args, flags)
                     receivedFlags = flags
-                end,
+                end
             })
             Commandline.registerCommand(cmd)
             Commandline.execute("build --verbose")
@@ -147,11 +147,11 @@ return function()
             const cmd = Commandline.Command.new({
                 Name = "build",
                 Flags = {
-                    Commandline.Flag.new({ Name = "verbose", Shorthand = "v" }),
+                    Commandline.Flag.new({ Name = "verbose", Shorthand = "v" })
                 },
                 Impl = function(args, flags)
                     receivedFlags = flags
-                end,
+                end
             })
             Commandline.registerCommand(cmd)
             Commandline.execute("build -v")
@@ -163,11 +163,11 @@ return function()
             const cmd = Commandline.Command.new({
                 Name = "serve",
                 Flags = {
-                    Commandline.Flag.new({ Name = "port", Type = "int" }),
+                    Commandline.Flag.new({ Name = "port", Type = "int" })
                 },
                 Impl = function(args, flags)
                     receivedFlags = flags
-                end,
+                end
             })
             Commandline.registerCommand(cmd)
             Commandline.execute("serve --port 8080")
@@ -179,16 +179,16 @@ return function()
             const cmd = Commandline.Command.new({
                 Name = "deploy",
                 Args = {
-                    Commandline.Arg.new({ Name = "environment" }),
+                    Commandline.Arg.new({ Name = "environment" })
                 },
                 Flags = {
                     Commandline.Flag.new({ Name = "verbose", Shorthand = "v" }),
-                    Commandline.Flag.new({ Name = "region", Type = "string" }),
+                    Commandline.Flag.new({ Name = "region", Type = "string" })
                 },
                 Impl = function(args, flags)
                     receivedArgs = args
                     receivedFlags = flags
-                end,
+                end
             })
             Commandline.registerCommand(cmd)
             Commandline.execute('deploy production --verbose --region "us-east-1"')
@@ -206,9 +206,9 @@ return function()
                         Name = "status",
                         Impl = function()
                             subExecuted = true
-                        end,
-                    }),
-                },
+                        end
+                    })
+                }
             })
             Commandline.registerCommand(cmd)
             Commandline.execute("git status")
@@ -257,11 +257,11 @@ return function()
                 Name = "add",
                 Args = {
                     Commandline.Arg.new({ Name = "a", Type = "int" }),
-                    Commandline.Arg.new({ Name = "b", Type = "int" }),
+                    Commandline.Arg.new({ Name = "b", Type = "int" })
                 },
                 Impl = function(args)
                     receivedArgs = args
-                end,
+                end
             })
             Commandline.registerCommand(cmd)
             Commandline.execute("add 10 20")
@@ -278,12 +278,12 @@ return function()
                     Commandline.Arg.new({
                         Name = "optional",
                         Required = false,
-                        Default = "default",
-                    }),
+                        Default = "default"
+                    })
                 },
                 Impl = function(args)
                     receivedArgs = args
-                end,
+                end
             })
             Commandline.registerCommand(cmd)
             Commandline.execute("test value")
@@ -296,11 +296,11 @@ return function()
             const cmd = Commandline.Command.new({
                 Name = "echo",
                 Args = {
-                    Commandline.Arg.new({ Name = "message" }),
+                    Commandline.Arg.new({ Name = "message" })
                 },
                 Impl = function(args)
                     receivedArgs = args
-                end,
+                end
             })
             Commandline.registerCommand(cmd)
             Commandline.execute('echo "Message with \\"quotes\\""')
@@ -310,7 +310,7 @@ return function()
         it("should throw error for tokenization errors", function()
             const cmd = Commandline.Command.new({
                 Name = "test",
-                Impl = function() end,
+                Impl = function() end
             })
             Commandline.registerCommand(cmd)
 
@@ -333,19 +333,19 @@ return function()
                 Name = "build",
                 Description = "Build the project",
                 Args = {
-                    Commandline.Arg.new({ Name = "target" }),
+                    Commandline.Arg.new({ Name = "target" })
                 },
                 Flags = {
                     Commandline.Flag.new({
                         Name = "production",
-                        Shorthand = "p",
-                    }),
+                        Shorthand = "p"
+                    })
                 },
                 Impl = function(args, flags)
                     buildExecuted = true
                     expect(args.target).to.equal("web")
                     expect(flags.production.Value).to.equal(true)
-                end,
+                end
             })
 
             const testCmd = Commandline.Command.new({
@@ -354,13 +354,13 @@ return function()
                 Flags = {
                     Commandline.Flag.new({
                         Name = "coverage",
-                        Shorthand = "c",
-                    }),
+                        Shorthand = "c"
+                    })
                 },
                 Impl = function(args, flags)
                     testExecuted = true
                     expect(flags.coverage.Value).to.equal(true)
-                end,
+                end
             })
 
             Commandline.registerCommand(buildCmd)

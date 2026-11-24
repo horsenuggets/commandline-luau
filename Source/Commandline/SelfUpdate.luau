@@ -44,12 +44,12 @@ export type ReplacementStep = "MakeExecutable" | "MoveTargetToOld" | "RemoveOld"
 function SelfUpdate.getReplacementSteps(options: {
     IsWindows: boolean,
     OldExists: boolean,
-    TargetExists: boolean,
+    TargetExists: boolean
 }): { ReplacementStep }
     assert(t.interface({
         IsWindows = t.boolean,
         OldExists = t.boolean,
-        TargetExists = t.boolean,
+        TargetExists = t.boolean
     })(options))
 
     const steps: { ReplacementStep } = {}
@@ -262,11 +262,11 @@ end
 ]]
 function SelfUpdate.replaceBinary(options: {
     targetPath: string,
-    newContents: string,
+    newContents: string
 })
     assert(t.interface({
         targetPath = t.string,
-        newContents = t.string,
+        newContents = t.string
     })(options))
 
     const targetPath = options.targetPath
@@ -278,7 +278,7 @@ function SelfUpdate.replaceBinary(options: {
         IsWindows = IS_WINDOWS,
         -- Only Windows leaves .old files behind, so Unix skips listing the directory
         OldExists = IS_WINDOWS and #SelfUpdate.findOldBinaries(targetPath, IS_WINDOWS) > 0,
-        TargetExists = fs.isFile(targetPath),
+        TargetExists = fs.isFile(targetPath)
     })
 
     for _, step in steps do
@@ -316,17 +316,17 @@ end
 ]]
 function SelfUpdate.copyBinary(options: {
     sourcePath: string,
-    targetPath: string,
+    targetPath: string
 })
     assert(t.interface({
         sourcePath = t.string,
-        targetPath = t.string,
+        targetPath = t.string
     })(options))
 
     const contents = fs.readFile(options.sourcePath)
     SelfUpdate.replaceBinary({
         targetPath = options.targetPath,
-        newContents = contents,
+        newContents = contents
     })
 end
 
@@ -407,7 +407,7 @@ function SelfUpdate.getAssetDownloadUrl(
     assert(t.string(name))
     assert(t.array(t.interface({
         name = t.string,
-        browser_download_url = t.string,
+        browser_download_url = t.string
     }))(assets))
     assert(t.string(platformSuffix))
 

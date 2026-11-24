@@ -16,7 +16,7 @@ const TEST_OPTIONS = {
     Name = "mytool",
     InstallDir = ".mytool-cli",
     Version = "1.0.0",
-    Repository = "user/repo",
+    Repository = "user/repo"
 }
 
 const Testable = require("@devpackages/Testable")
@@ -34,7 +34,7 @@ return function()
                 Name = "rbxstudio",
                 InstallDir = ".rbxstudio-cli",
                 Version = "1.0.0",
-                Repository = "user/repo",
+                Repository = "user/repo"
             })
             expect(string.find(cmd.Description, "rbxstudio")).to.be.ok()
         end)
@@ -52,7 +52,7 @@ return function()
             expect(function()
                 Toolkit.installCommand({
                     Name = "test",
-                    InstallDir = ".test",
+                    InstallDir = ".test"
                 } :: any)
             end).to.throw()
         end)
@@ -69,7 +69,7 @@ return function()
                 Name = "rbxstudio",
                 InstallDir = ".rbxstudio-cli",
                 Version = "1.0.0",
-                Repository = "user/repo",
+                Repository = "user/repo"
             })
             expect(string.find(cmd.Description, "rbxstudio")).to.be.ok()
         end)

@@ -16,14 +16,14 @@ export type Arg = {
     Description: string,
     Type: TypeUtils.ArgType,
     Required: boolean,
-    Default: any?,
+    Default: any?
 }
 export type ArgOptions = {
     Name: string,
     Description: string?,
     Type: TypeUtils.ArgType?,
     Required: boolean?,
-    Default: any?,
+    Default: any?
 }
 
 const IArgOptions = t.strictInterface({
@@ -31,7 +31,7 @@ const IArgOptions = t.strictInterface({
     Description = t.optional(t.string),
     Type = t.optional(t.string),
     Required = t.optional(t.boolean),
-    Default = t.optional(t.any),
+    Default = t.optional(t.any)
 })
 
 const Arg = {}

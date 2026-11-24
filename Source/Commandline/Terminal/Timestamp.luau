@@ -14,13 +14,13 @@ export type Mode = "Disabled" | "Local" | "Offset" | "Stopwatch" | "Utc"
 
 export type Config = {
     Mode: Mode,
-    OffsetMinutes: number?,
+    OffsetMinutes: number?
 }
 
 export type Sample = {
     ElapsedSeconds: number,
     LocalOffsetMinutes: number,
-    UnixMillis: number,
+    UnixMillis: number
 }
 
 const MILLIS_PER_DAY = 86400000
@@ -29,7 +29,7 @@ const MODES = {
     Local = true,
     Offset = true,
     Stopwatch = true,
-    Utc = true,
+    Utc = true
 }
 const NAMED_SPECS = {
     disabled = "Disabled",
@@ -37,7 +37,7 @@ const NAMED_SPECS = {
     none = "Disabled",
     off = "Disabled",
     stopwatch = "Stopwatch",
-    utc = "Utc",
+    utc = "Utc"
 }
 
 const Timestamp = {}
@@ -111,7 +111,7 @@ function Timestamp.format(config: Config, sample: Sample): (string?, string?)
     assert(t.interface({
         ElapsedSeconds = t.number,
         LocalOffsetMinutes = t.number,
-        UnixMillis = t.number,
+        UnixMillis = t.number
     })(sample))
 
     if config.Mode == "Disabled" then
