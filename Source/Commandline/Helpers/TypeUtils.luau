@@ -13,8 +13,8 @@ const TypeUtils = {
         boolean = true,
         int = true,
         number = true,
-        string = true,
-    } :: { [string]: boolean },
+        string = true
+    } :: { [string]: boolean }
 }
 
 export type ArgType = "boolean" | "int" | "number" | "string"

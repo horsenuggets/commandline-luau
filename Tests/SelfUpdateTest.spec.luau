@@ -54,7 +54,7 @@ return function()
             ["windows, no target, no old"] = { "Write" },
             ["windows, no target, old"] = { "RemoveOld", "Write" },
             ["windows, target, no old"] = { "MoveTargetToOld", "Write" },
-            ["windows, target, old"] = { "RemoveOld", "MoveTargetToOld", "Write" },
+            ["windows, target, old"] = { "RemoveOld", "MoveTargetToOld", "Write" }
         }
 
         for _, isWindows in { false, true } do
@@ -67,7 +67,7 @@ return function()
                     const options = {
                         IsWindows = isWindows,
                         OldExists = oldExists,
-                        TargetExists = targetExists,
+                        TargetExists = targetExists
                     }
 
                     it(`should return the expected steps for {label}`, function()
@@ -129,7 +129,7 @@ return function()
             fs.writeFile(targetPath, "old contents")
             SelfUpdate.replaceBinary({
                 targetPath = targetPath,
-                newContents = "new contents",
+                newContents = "new contents"
             })
 
             expect(fs.readFile(targetPath)).to.equal("new contents")
@@ -142,7 +142,7 @@ return function()
 
             SelfUpdate.replaceBinary({
                 targetPath = targetPath,
-                newContents = "brand new",
+                newContents = "brand new"
             })
 
             expect(fs.isFile(targetPath)).to.equal(true)
@@ -157,7 +157,7 @@ return function()
 
                 SelfUpdate.replaceBinary({
                     targetPath = targetPath,
-                    newContents = "executable",
+                    newContents = "executable"
                 })
 
                 -- Verify executable bit via test -x
@@ -180,7 +180,7 @@ return function()
 
                 SelfUpdate.replaceBinary({
                     targetPath = targetPath,
-                    newContents = "replaced data",
+                    newContents = "replaced data"
                 })
 
                 expect(fs.readFile(targetPath)).to.equal("replaced data")
@@ -199,7 +199,7 @@ return function()
 
                 SelfUpdate.replaceBinary({
                     targetPath = targetPath,
-                    newContents = "new binary",
+                    newContents = "new binary"
                 })
 
                 expect(fs.readFile(targetPath)).to.equal("new binary")
@@ -229,7 +229,7 @@ return function()
             fs.writeFile(targetPath, "stale binary")
             SelfUpdate.copyBinary({
                 sourcePath = sourcePath,
-                targetPath = targetPath,
+                targetPath = targetPath
             })
 
             expect(fs.readFile(targetPath)).to.equal("source binary")
@@ -244,7 +244,7 @@ return function()
             fs.writeFile(path, "self binary")
             SelfUpdate.copyBinary({
                 sourcePath = path,
-                targetPath = path,
+                targetPath = path
             })
 
             expect(fs.readFile(path)).to.equal("self binary")
@@ -262,7 +262,7 @@ return function()
 
                 SelfUpdate.copyBinary({
                     sourcePath = path,
-                    targetPath = path,
+                    targetPath = path
                 })
 
                 -- The link still points at the original inode. Rewriting it would show
@@ -327,7 +327,7 @@ return function()
                 { "640", "750" },
                 { "4755", "4755" },
                 { "4644", "4755" },
-                { "000", "000" },
+                { "000", "000" }
             }
             for _, case in cases do
                 expect(SelfUpdate.getChmodMode(case[1])).to.equal(case[2])
@@ -471,7 +471,7 @@ return function()
                 { "C:\\Users\\me\\bin\\tool.exe", "C:\\Users\\me\\bin\\", "tool.exe" },
                 { "C:\\Users\\me/.tool/bin/tool.exe", "C:\\Users\\me/.tool/bin/", "tool.exe" },
                 { "/tool", "/", "tool" },
-                { "tool", "", "tool" },
+                { "tool", "", "tool" }
             }
 
             for _, case in cases do
@@ -518,7 +518,7 @@ return function()
                 const found = SelfUpdate.findOldBinaries(binaryPath, false)
                 const ok = pcall(SelfUpdate.replaceBinary, {
                     targetPath = binaryPath,
-                    newContents = "new binary",
+                    newContents = "new binary"
                 })
 
                 process.exec("chmod", { "700", dir })
@@ -624,11 +624,11 @@ return function()
                             `tool-{osName}-{if architecture[1] == "x64" then "arm64" else "x64"}{extension}`,
                             `tool-other-{architecture[2]}{extension}`,
                             `tool-{osName}-{architecture[2]}{extension}.sha256`,
-                            `tool-{suffix}{if extension == "" then ".exe" else ""}`,
+                            `tool-{suffix}{if extension == "" then ".exe" else ""}`
                         }
                     do
                         expect(SelfUpdate.getAssetDownloadUrl("tool", {
-                            { name = assetName, browser_download_url = "https://example.com/unrelated" },
+                            { name = assetName, browser_download_url = "https://example.com/unrelated" }
                         }, suffix)).to.equal(nil)
                     end
                     expect(SelfUpdate.getAssetDownloadUrl("tool", {}, suffix)).to.equal(nil)

@@ -20,7 +20,7 @@ type Harness = {
     Advance: (seconds: number) -> (),
     Errors: { string },
     Output: { string },
-    Terminal: Terminal.Terminal,
+    Terminal: Terminal.Terminal
 }
 
 const function harness(config: Terminal.Config?): Harness
@@ -37,7 +37,7 @@ const function harness(config: Terminal.Config?): Harness
         end,
         UnixMillis = function()
             return 1795460709042
-        end,
+        end
     }
     options.Env = options.Env or {}
     options.Write = function(text)
@@ -52,7 +52,7 @@ const function harness(config: Terminal.Config?): Harness
         end,
         Errors = errors,
         Output = output,
-        Terminal = Terminal.new(options),
+        Terminal = Terminal.new(options)
     }
 end
 
@@ -133,7 +133,7 @@ return function()
                 { "", nil, true },
                 { "1", nil, false },
                 { "1", true, true },
-                { nil, false, false },
+                { nil, false, false }
             }
             for _, case in cases do
                 const terminal = harness({ Color = case[2], Env = { NO_COLOR = case[1] } }).Terminal
@@ -177,7 +177,7 @@ return function()
                 Identifier = terminal.Identifier,
                 Success = terminal.Success,
                 Url = terminal.Url,
-                Warning = terminal.Warning,
+                Warning = terminal.Warning
             }
             for key, helper in helpers do
                 expect(helper(terminal, "text")).to.equal(Style.paint((terminal.Theme :: any)[key], "text", true))
@@ -262,7 +262,7 @@ return function()
                     const h = harness({
                         Color = color,
                         Columns = 18,
-                        Timestamps = if timestamps then "stopwatch" else nil,
+                        Timestamps = if timestamps then "stopwatch" else nil
                     })
                     const text = h.Terminal:Warning("One two three four five.\n\nSix seven eight nine.")
                     h.Terminal:Print(text, { Wrap = false })
@@ -306,7 +306,7 @@ return function()
                             end,
                             UnixMillis = function()
                                 error("Suppressed timestamps must not read wall-clock time.")
-                            end,
+                            end
                         }
                         h.Terminal._clock = unreadClock
                         const text = h.Terminal:Warning("One two three four five.\n\nSix seven eight nine.")
@@ -376,9 +376,9 @@ return function()
                     Columns = 25,
                     Theme = {
                         TimestampBracket = { Color = "#a8a8a8", Opacity = 0.25 },
-                        TimestampFaint = { Color = "#a8a8a8", Opacity = 0.25 },
+                        TimestampFaint = { Color = "#a8a8a8", Opacity = 0.25 }
                     },
-                    Timestamps = "stopwatch",
+                    Timestamps = "stopwatch"
                 })
                 h.Advance(0.001)
                 h.Terminal:Print("One two three four.")

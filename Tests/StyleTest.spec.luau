@@ -8,6 +8,10 @@ for every attribute combination, and path painting with center dots.
 --]]
 
 const Style = require("../Source/Commandline/Terminal/Style")
+const Text = require("../Source/Commandline/Terminal/Text")
+const fs = require("@lune/fs")
+const luau = require("@lune/luau")
+const t = require("@packages/t")
 
 const Testable = require("@devpackages/Testable")
 const describe, expect, it = Testable.describe, Testable.expect, Testable.it
@@ -86,7 +90,7 @@ return function()
                     { Opacity = 0.25 },
                     { Color = "gray", Opacity = 0.25 },
                     { Color = "#12345", Opacity = 0.25 },
-                    { Color = "#a8a8a8", Opacity = "0.25" } :: any,
+                    { Color = "#a8a8a8", Opacity = "0.25" } :: any
                 }
             do
                 expect(Style.validate(spec)).to.equal(false)
@@ -134,7 +138,7 @@ return function()
                     "StepTotal",
                     "TimestampBracket",
                     "TimestampFaint",
-                    "Url",
+                    "Url"
                 }
             do
                 expect(theme[key].Color).to.equal(theme.TimestampText.Color)
@@ -285,6 +289,70 @@ return function()
     end)
 
     describe("Style.sgrState", function()
+        it("should canonicalize previous styles without tokenizing plain text", function()
+            const source = fs.readFile("Source/Commandline/Terminal/Style.luau")
+            for _, text in { "", "Plain ASCII [31m", "Café 界 e\u{301}", string.rep("x", 8192) } do
+                for _, case in
+                    {
+                        { "", "" },
+                        { "unstyled", "" },
+                        { `{ESCAPE}31;1m{ESCAPE}32m`, `{ESCAPE}1m{ESCAPE}32m` },
+                        { `{ESCAPE}1;31m{ESCAPE}0m`, "" },
+                        { `{ESCAPE}48;2;1;2;3;38:2::4:5:6m`, `{ESCAPE}38:2::4:5:6m{ESCAPE}48;2;1;2;3m` }
+                    }
+                do
+                    const previous, expected = case[1], case[2]
+                    const dependencies: { [string]: any } = {
+                        ["./Text"] = {
+                            tokens = function(input: string)
+                                -- Guard the boundary rather than relying on elapsed time or call counts.
+                                expect(input).to.equal(previous)
+                                return Text.tokens(input)
+                            end
+                        },
+                        ["@packages/t"] = t
+                    }
+                    const style = luau.load(source, {
+                        environment = {
+                            require = function(path)
+                                return assert(dependencies[path], `Unexpected dependency "{path}".`)
+                            end
+                        }
+                    })()
+                    expect(style.sgrState(previous, text)).to.equal(expected)
+                    expect(Style.sgrState(previous, text)).to.equal(expected)
+                end
+            end
+        end)
+
+        it("should not treat C1 controls or Unicode lookalikes as ANSI escapes", function()
+            for _, text in { "\u{9b}31m", string.char(0x9b) .. "31m", "␛[31m", "[0m", "\u{1b0}31m" } do
+                expect(Style.sgrState("", text)).to.equal("")
+                expect(Style.sgrState(`{ESCAPE}1;32m`, text)).to.equal(`{ESCAPE}1m{ESCAPE}32m`)
+            end
+        end)
+
+        it("should still parse escapes after long plain prefixes and reset active styles", function()
+            const prefix = string.rep("x", 8192)
+            expect(Style.sgrState(`{ESCAPE}1;31m`, `{prefix}{ESCAPE}32m`)).to.equal(`{ESCAPE}1m{ESCAPE}32m`)
+            expect(Style.sgrState(`{ESCAPE}1;31m`, `{prefix}{ESCAPE}m`)).to.equal("")
+            expect(Style.sgrState(`{ESCAPE}1m`, `\u{1b}]title {ESCAPE}0m\u{7}plain`)).to.equal(`{ESCAPE}1m`)
+        end)
+
+        it("should preserve escapes completed across the previous and text boundary", function()
+            for _, case in
+                {
+                    { "\u{1b}", "[31m", `{ESCAPE}31m` },
+                    { `{ESCAPE}3`, "1m", `{ESCAPE}31m` },
+                    { `{ESCAPE}1m{ESCAPE}`, "0m", "" },
+                    { `{ESCAPE}38:2::1:`, "2:3m", `{ESCAPE}38:2::1:2:3m` },
+                    { `{ESCAPE}1m{ESCAPE}3`, "plain", `{ESCAPE}1m` }
+                }
+            do
+                expect(Style.sgrState(case[1], case[2])).to.equal(case[3])
+            end
+        end)
+
         it("should retain only active attributes and complete extended colors", function()
             const rgba = `{ESCAPE}38:6::168:168:168:128m`
             expect(Style.sgrState("", `{ESCAPE}1;2;3m{rgba}`)).to.equal(`{ESCAPE}1m{ESCAPE}2m{ESCAPE}3m{rgba}`)

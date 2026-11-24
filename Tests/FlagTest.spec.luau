@@ -26,7 +26,7 @@ return function()
         it("should create a Flag with custom description", function()
             const flag = Flag.new({
                 Name = "verbose",
-                Description = "Enable verbose output",
+                Description = "Enable verbose output"
             })
             expect(flag.Description).to.equal("Enable verbose output")
         end)
@@ -34,7 +34,7 @@ return function()
         it("should create a Flag with shorthand", function()
             const flag = Flag.new({
                 Name = "verbose",
-                Shorthand = "v",
+                Shorthand = "v"
             })
             expect(flag.Shorthand).to.equal("v")
         end)
@@ -43,14 +43,14 @@ return function()
             expect(function()
                 Flag.new({
                     Name = "test",
-                    Shorthand = "ab",
+                    Shorthand = "ab"
                 })
             end).to.throw()
 
             expect(function()
                 Flag.new({
                     Name = "test",
-                    Shorthand = "",
+                    Shorthand = ""
                 })
             end).to.throw()
         end)
@@ -58,7 +58,7 @@ return function()
         it("should create a typed Flag with boolean type", function()
             const flag = Flag.new({
                 Name = "enabled",
-                Type = "boolean",
+                Type = "boolean"
             })
             expect(flag.Type).to.equal("boolean")
         end)
@@ -66,7 +66,7 @@ return function()
         it("should create a typed Flag with int type", function()
             const flag = Flag.new({
                 Name = "count",
-                Type = "int",
+                Type = "int"
             })
             expect(flag.Type).to.equal("int")
         end)
@@ -74,7 +74,7 @@ return function()
         it("should create a typed Flag with number type", function()
             const flag = Flag.new({
                 Name = "value",
-                Type = "number",
+                Type = "number"
             })
             expect(flag.Type).to.equal("number")
         end)
@@ -82,7 +82,7 @@ return function()
         it("should create a typed Flag with string type", function()
             const flag = Flag.new({
                 Name = "name",
-                Type = "string",
+                Type = "string"
             })
             expect(flag.Type).to.equal("string")
         end)
@@ -91,7 +91,7 @@ return function()
             expect(function()
                 Flag.new({
                     Name = "test",
-                    Type = "invalid",
+                    Type = "invalid"
                 })
             end).to.throw()
         end)
@@ -100,7 +100,7 @@ return function()
             const flag = Flag.new({
                 Name = "port",
                 Type = "int",
-                Default = 8080,
+                Default = 8080
             })
             expect(flag.Type).to.equal("int")
             expect(flag.Default).to.equal(8080)
@@ -111,7 +111,7 @@ return function()
                 Flag.new({
                     Name = "port",
                     Type = "int",
-                    Default = "not a number",
+                    Default = "not a number"
                 })
             end).to.throw()
 
@@ -119,7 +119,7 @@ return function()
                 Flag.new({
                     Name = "enabled",
                     Type = "boolean",
-                    Default = "true",
+                    Default = "true"
                 })
             end).to.throw()
 
@@ -127,7 +127,7 @@ return function()
                 Flag.new({
                     Name = "value",
                     Type = "number",
-                    Default = "3.14",
+                    Default = "3.14"
                 })
             end).to.throw()
 
@@ -135,7 +135,7 @@ return function()
                 Flag.new({
                     Name = "name",
                     Type = "string",
-                    Default = 123,
+                    Default = 123
                 })
             end).to.throw()
         end)
@@ -144,7 +144,7 @@ return function()
             const flag = Flag.new({
                 Name = "count",
                 Type = "int",
-                Default = 5,
+                Default = 5
             })
             expect(flag.Default).to.equal(5)
 
@@ -152,7 +152,7 @@ return function()
                 Flag.new({
                     Name = "count",
                     Type = "int",
-                    Default = 3.14,
+                    Default = 3.14
                 })
             end).to.throw()
         end)
@@ -161,14 +161,14 @@ return function()
             expect(function()
                 Flag.new({
                     Name = "test",
-                    Default = "value",
+                    Default = "value"
                 })
             end).to.throw()
         end)
 
         it("should allow nil default when no type is specified", function()
             const flag = Flag.new({
-                Name = "test",
+                Name = "test"
             })
             expect(flag.Default).to.equal(nil)
         end)
@@ -186,7 +186,7 @@ return function()
         it("should throw error when Name is missing", function()
             expect(function()
                 Flag.new({
-                    Description = "Missing name",
+                    Description = "Missing name"
                 } :: any)
             end).to.throw()
         end)
@@ -197,7 +197,7 @@ return function()
                 Description = "Server port number",
                 Type = "int",
                 Shorthand = "p",
-                Default = 3000,
+                Default = 3000
             })
             expect(flag.Name).to.equal("port")
             expect(flag.Description).to.equal("Server port number")

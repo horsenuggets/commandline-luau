@@ -34,7 +34,7 @@ const Commandline = {
     Toolkit = Toolkit,
 
     -- Private static properties
-    _commands = {} :: { [string]: Command.Command },
+    _commands = {} :: { [string]: Command.Command }
 }
 
 function Commandline.registerCommand(command: Command.Command)

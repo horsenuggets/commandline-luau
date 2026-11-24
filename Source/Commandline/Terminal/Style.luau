@@ -17,7 +17,7 @@ const CLOSING_PARAMETERS = {
     ["23"] = true,
     ["24"] = true,
     ["39"] = true,
-    ["49"] = true,
+    ["49"] = true
 }
 const ESCAPE = "\u{1b}["
 const NAMED_COLORS = {
@@ -37,7 +37,7 @@ const NAMED_COLORS = {
     white = 37,
     whiteBright = 97,
     yellow = 33,
-    yellowBright = 93,
+    yellowBright = 93
 }
 const PATH_SEPARATOR_DOT = "·"
 const SGR_RESETS = {
@@ -52,7 +52,7 @@ const SGR_RESETS = {
     [49] = 40,
     [54] = 51,
     [55] = 53,
-    [59] = 58,
+    [59] = 58
 }
 
 export type Spec = {
@@ -61,7 +61,7 @@ export type Spec = {
     Dim: boolean?,
     Italic: boolean?,
     Opacity: number?,
-    Underline: boolean?,
+    Underline: boolean?
 }
 
 export type Theme = {
@@ -82,7 +82,7 @@ export type Theme = {
     TimestampFaint: Spec,
     TimestampText: Spec,
     Url: Spec,
-    Warning: Spec,
+    Warning: Spec
 }
 
 export type ThemeOverrides = { [string]: Spec }
@@ -111,7 +111,7 @@ const DEFAULT_THEME: Theme = table.freeze({
     TimestampFaint = table.freeze({ Color = MUTED_GRAY, Dim = true }),
     TimestampText = table.freeze({ Color = MUTED_GRAY }),
     Url = table.freeze({ Color = MUTED_GRAY }),
-    Warning = table.freeze({ Color = "yellow" }),
+    Warning = table.freeze({ Color = "yellow" })
 }) :: any
 
 const specCheck = t.strictInterface({
@@ -120,7 +120,7 @@ const specCheck = t.strictInterface({
     Dim = t.optional(t.boolean),
     Italic = t.optional(t.boolean),
     Opacity = t.optional(t.number),
-    Underline = t.optional(t.boolean),
+    Underline = t.optional(t.boolean)
 })
 
 const Style = {}
@@ -316,8 +316,12 @@ end
 function Style.sgrState(previous: string, text: string): string
     assert(t.string(previous))
     assert(t.string(text))
+    -- Plain text cannot change SGR state unless it completes a previous escape.
+    -- Still parse previous so combined attributes, overrides, and resets canonicalize.
+    const pending = string.sub(previous, -1) == "\u{1b}" or string.find(previous, "\u{1b}%[[%d;:]*$") ~= nil
+    const input = if pending or string.find(text, "\u{1b}", 1, true) then `{previous}{text}` else previous
     const active: { [number]: string } = {}
-    for _, token in Text.tokens(`{previous}{text}`) do
+    for _, token in Text.tokens(input) do
         const parameters = if token.Escape then string.match(token.Text, "^\u{1b}%[([%d;:]*)m$") else nil
         if parameters == nil then
             continue
