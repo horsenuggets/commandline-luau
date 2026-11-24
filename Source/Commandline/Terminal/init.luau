@@ -51,6 +51,10 @@ export type PathOptions = {
     Home: string?,
 }
 
+export type PrintOptions = {
+    Wrap: boolean?,
+}
+
 export type Stream = {
     Flush: () -> (),
     Write: (chunk: string) -> (),
@@ -75,8 +79,8 @@ export type Terminal = {
     Paint: (self: Terminal, key: string, text: string) -> string,
     Path: (self: Terminal, path: string, options: PathOptions?) -> string,
     Prefix: (self: Terminal) -> string,
-    Print: (self: Terminal, text: string?) -> (),
-    PrintError: (self: Terminal, text: string?) -> (),
+    Print: (self: Terminal, text: string?, options: PrintOptions?) -> (),
+    PrintError: (self: Terminal, text: string?, options: PrintOptions?) -> (),
     RobloxPath: (self: Terminal, path: string) -> string,
     Step: (self: Terminal, index: number, total: number, text: string) -> string,
     Stream: (self: Terminal, target: Target?) -> Stream,
@@ -331,11 +335,18 @@ function Terminal.Columns(self: Terminal): number
     return self._columns :: number
 end
 
-const function writeLines(self: Terminal, target: Target, text: string?, previousStyle: string?): string
+const function writeLines(
+    self: Terminal,
+    target: Target,
+    text: string?,
+    previousStyle: string?,
+    options: PrintOptions?
+): string
     assert(t.optional(t.string)(text))
+    assert(t.optional(t.strictInterface({ Wrap = t.optional(t.boolean) }))(options))
 
     local activeStyle = previousStyle or ""
-    const columns = self:Columns()
+    const columns = if options and options.Wrap == false then 0 else self:Columns()
     const lines = {}
     for line in string.gmatch(`{text or ""}\n`, "([^\n]*)\n") do
         const trimmed = string.gsub(line, "\r$", "")
@@ -355,14 +366,14 @@ const function writeLines(self: Terminal, target: Target, text: string?, previou
     return activeStyle
 end
 
--- Writes text to standard output, prefixing each line with the timestamp.
-function Terminal.Print(self: Terminal, text: string?)
-    writeLines(self, "Output", text)
+-- Writes timestamped text to standard output. Pass Wrap = false for preformatted text.
+function Terminal.Print(self: Terminal, text: string?, options: PrintOptions?)
+    writeLines(self, "Output", text, nil, options)
 end
 
--- Writes text to standard error, prefixing each line with the timestamp.
-function Terminal.PrintError(self: Terminal, text: string?)
-    writeLines(self, "Error", text)
+-- Writes timestamped text to standard error. Pass Wrap = false for preformatted text.
+function Terminal.PrintError(self: Terminal, text: string?, options: PrintOptions?)
+    writeLines(self, "Error", text, nil, options)
 end
 
 --[[

@@ -8,11 +8,59 @@ subcommands, and help generation.
 --]]
 
 const Arg = require("../Source/Commandline/Arg")
+const Chalk = require("@packages/Chalk")
 const Command = require("../Source/Commandline/Command")
 const Flag = require("../Source/Commandline/Flag")
+const Style = require("../Source/Commandline/Terminal/Style")
+const Terminal = require("../Source/Commandline/Terminal")
+const t = require("@packages/t")
 
 const Testable = require("@devpackages/Testable")
 const describe, expect, it = Testable.describe, Testable.expect, Testable.it
+
+const CLOCK = {
+    Elapsed = function()
+        return 0
+    end,
+    LocalOffsetMinutes = function()
+        return 0
+    end,
+    UnixMillis = function()
+        return 0
+    end,
+}
+const function executeWithOutput(
+    makeCommand: (typeof(Command)) -> Command.Command,
+    tokens: { string },
+    config: Terminal.Config?
+): (string, string, string)
+    assert(t.callback(makeCommand))
+    assert(t.array(t.string)(tokens))
+    assert(t.optional(t.table)(config))
+
+    const combined = {}
+    const output = {}
+    const errors = {}
+    const options: Terminal.Config = table.clone(config or {})
+    options.Env = options.Env or {}
+    options.Write = function(text)
+        table.insert(combined, text)
+        table.insert(output, text)
+    end
+    options.WriteError = function(text)
+        table.insert(combined, text)
+        table.insert(errors, text)
+    end
+    const previous = Terminal.default()
+    const command = makeCommand(Command)
+    Terminal.setDefault(Terminal.new(options))
+    const ok, problem = pcall(function()
+        command:Execute(tokens)
+    end)
+    Terminal.setDefault(previous)
+    assert(ok, tostring(problem))
+    return table.concat(combined), table.concat(output), table.concat(errors)
+end
 
 return function()
     describe("Command.new", function()
@@ -562,7 +610,182 @@ return function()
         end)
     end)
 
+    describe("Command output", function()
+        it("should timestamp root and nested help without wrapping or changing its layout", function()
+            for _, timestamps in { false, true } do
+                for _, nested in { false, true } do
+                    const output, stdout, stderr = executeWithOutput(
+                        function(command)
+                            return command.new({
+                                Name = "app",
+                                Description = "Manage places without wrapping this long description.",
+                                Version = "1.2.3",
+                                Subcommands = {
+                                    command.new({
+                                        Name = "open",
+                                        Description = "Open a place without wrapping this long description.",
+                                    }),
+                                },
+                            })
+                        end,
+                        if nested then { "open", "--help" } else { "--help" },
+                        {
+                            Clock = CLOCK,
+                            Color = false,
+                            Columns = 12,
+                            Env = if timestamps then { COMMANDLINE_TIMESTAMPS = "stopwatch" } else {},
+                        }
+                    )
+                    const expected = if nested
+                        then "Open a place without wrapping this long description.\n\n[Usage]\n> app open [flags...]\n\n[Flags]\n> -h, --help -- Show help message.\n"
+                        else "app [1.2.3]\nManage places without wrapping this long description.\n\n[Usage]\n> app <subcommand>\n\n[Flags]\n> -h, --help -- Show help message.\n> -v, --version -- Show version.\n\n[Subcommands]\n> open -- Open a place without wrapping this long description.\n"
+                    const expectedLines = string.split(expected, "\n")
+                    if timestamps then
+                        for index, line in expectedLines do
+                            if line ~= "" then
+                                expectedLines[index] = `[00:00.000] {line}`
+                            end
+                        end
+                    end
+                    expect(Style.strip(output)).to.equal(table.concat(expectedLines, "\n"))
+                    expect(stdout).to.equal(output)
+                    expect(stderr).to.equal("")
+                    expect(
+                        string.find(
+                            output,
+                            Chalk.italic(
+                                Chalk.hex(Style.DefaultTheme.Muted.Color :: string)(
+                                    if nested
+                                        then "Open a place without wrapping this long description."
+                                        else "Manage places without wrapping this long description."
+                                )
+                            ),
+                            1,
+                            true
+                        )
+                    ).to.be.ok()
+                end
+            end
+        end)
+
+        it("should print both version flags to stdout using the current default terminal", function()
+            for _, timestamps in { false, true } do
+                for _, flag in { "--version", "-v" } do
+                    const output, stdout, stderr = executeWithOutput(function(command)
+                        return command.new({ Name = "app", Version = "1.2.3" })
+                    end, { flag }, {
+                        Clock = CLOCK,
+                        Color = false,
+                        Timestamps = if timestamps then "stopwatch" else nil,
+                    })
+                    expect(output).to.equal(if timestamps then "[00:00.000] 1.2.3\n" else "1.2.3\n")
+                    expect(stdout).to.equal(output)
+                    expect(stderr).to.equal("")
+                end
+            end
+        end)
+
+        it("should timestamp diagnostics on stderr and keep the separating blank line blank", function()
+            const output, stdout, stderr = executeWithOutput(function(command)
+                return command.new({ Name = "app", Description = "Manage places." })
+            end, { "--unknown" }, {
+                Clock = CLOCK,
+                Color = false,
+                Timestamps = "stopwatch",
+            })
+            expect(Style.strip(stderr)).to.equal("[00:00.000] Unknown flag --unknown.\n\n")
+            expect(Style.strip(stdout):sub(1, 16)).to.equal("[00:00.000] app\n")
+            expect(output).to.equal(`{stderr}{stdout}`)
+            expect(string.find(stderr, Chalk.red(`Unknown flag {Chalk.bold("--unknown")}.`), 1, true)).to.be.ok()
+        end)
+
+        it("should print unlabelled red errors followed by one blank line before help", function()
+            const cases = {
+                { Message = "Missing required args.", Tokens = { "open" } },
+                { Message = "Too many args provided.", Tokens = { "open", "one", "two" } },
+                { Message = "Unknown flag --unknown.", Tokens = { "open", "--unknown" } },
+                { Message = "Unknown flag -u.", Tokens = { "open", "-u" } },
+                { Message = "Invalid shorthand flag format -bad.", Tokens = { "open", "-bad" } },
+                { Message = "Invalid shorthand flag format --.", Tokens = { "open", "--" } },
+                { Message = "flag --count requires a value.", Tokens = { "open", "--count" } },
+                { Message = "flag -c requires a value.", Tokens = { "open", "-c" } },
+                {
+                    Message = 'flag --count - Unable to cast "bad" to int. Not a valid number.',
+                    Tokens = { "open", "--count", "bad" },
+                },
+                {
+                    Message = 'flag -c - Unable to cast "bad" to int. Not a valid number.',
+                    Tokens = { "open", "-c", "bad" },
+                },
+                { Message = "Unknown subcommand unknown.", Tokens = { "unknown" } },
+            }
+            for _, case in cases do
+                const output, stdout, stderr = executeWithOutput(function(command)
+                    return command.new({
+                        Name = "app",
+                        Description = "Manage places.",
+                        Subcommands = {
+                            command.new({
+                                Name = "open",
+                                Description = "Open a place.",
+                                Args = { Arg.new({ Name = "place" }) },
+                                Flags = { Flag.new({ Name = "count", Shorthand = "c", Type = "int" }) },
+                            }),
+                        },
+                    })
+                end, case.Tokens)
+                const lines = string.split(Style.strip(output), "\n")
+                expect(Style.strip(stderr)).to.equal(`{case.Message}\n\n`)
+                expect(output).to.equal(`{stderr}{stdout}`)
+                expect(lines[1]).to.equal(case.Message)
+                expect(lines[2]).to.equal("")
+                expect(lines[3]).to.equal(if case.Tokens[1] == "open" then "Open a place." else "app")
+                expect(string.sub(output, 1, 5)).to.equal("\u{1b}[31m")
+                expect(string.find(output, "[Error]", 1, true)).to.equal(nil)
+            end
+        end)
+
+        it("should start explicit subcommand help at its description without a blank line", function()
+            const output = executeWithOutput(function(command)
+                return command.new({
+                    Name = "app",
+                    Subcommands = { command.new({ Name = "open", Description = "Open a place." }) },
+                })
+            end, { "open", "--help" })
+            expect(string.split(Style.strip(output), "\n")[1]).to.equal("Open a place.")
+        end)
+    end)
+
     describe("Command.ShowHelp", function()
+        it("should preserve root headings with and without a version and no opening blank line", function()
+            for _, version in { "", "1.2.3" } do
+                const cmd = Command.new({
+                    Name = "app",
+                    Description = "Manage places.",
+                    Version = if version == "" then nil else version,
+                })
+                const lines = string.split(Style.strip(cmd._helpMessage), "\n")
+                expect(lines[1]).to.equal(if version == "" then "app" else "app [1.2.3]")
+                expect(lines[2]).to.equal("Manage places.")
+                expect(lines[3]).to.equal("")
+                expect(lines[4]).to.equal("[Usage]")
+                expect(string.find(cmd._helpMessage, Chalk.bold("app"), 1, true)).to.equal(1)
+            end
+        end)
+
+        it("should use the shared lighter gray for secondary help text", function()
+            const cmd = Command.new({
+                Name = "app",
+                Description = "Manage places.",
+                Version = "1.2.3",
+                Subcommands = { Command.new({ Name = "open", Description = "Open a place." }) },
+            })
+            const muted = Chalk.hex(Style.DefaultTheme.Muted.Color :: string)
+            expect(string.find(cmd._helpMessage, Chalk.italic(muted(cmd.Description)), 1, true)).to.be.ok()
+            expect(string.find(cmd._helpMessage, Chalk.italic(muted("Open a place.")), 1, true)).to.be.ok()
+            expect(string.find(cmd._helpMessage, "\u{1b}[90m", 1, true)).to.equal(nil)
+        end)
+
         it("should generate help message", function()
             const cmd = Command.new({
                 Name = "test",
@@ -601,6 +824,14 @@ return function()
             })
             expect(middle._commandPath).to.equal("app api-key")
             expect(leaf._commandPath).to.equal("app api-key list")
+            for _, command in { middle, leaf } do
+                const lines = string.split(Style.strip(command._helpMessage), "\n")
+                expect(lines[1]).to.equal(command.Description)
+                expect(lines[2]).to.equal("")
+                expect(lines[3]).to.equal("[Usage]")
+                expect(string.find(lines[4], command._commandPath, 1, true)).to.be.ok()
+                expect(string.find(command._helpMessage, Chalk.bold(command._commandPath), 1, true)).to.equal(nil)
+            end
         end)
 
         it("should include command path in help message", function()
