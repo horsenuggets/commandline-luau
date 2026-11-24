@@ -8,6 +8,7 @@ overridden. Contains no I/O, so callers decide whether color is enabled.
 
 --]]
 
+const Text = require("./Text")
 const t = require("@packages/t")
 
 const CLOSING_PARAMETERS = {
@@ -111,7 +112,6 @@ const specCheck = t.strictInterface({
 const Style = {}
 
 Style.DefaultTheme = DEFAULT_THEME
-Style.SgrPattern = "\u{1b}%[[%d;:]*m"
 
 -- Opacity explicitly opts a hex foreground into the RGBA SGR extension. Palette colors
 -- have no fixed RGB value, so cannot be given an alpha without guessing the theme.
@@ -228,13 +228,15 @@ function Style.paint(spec: Spec, text: string, color: boolean): string
     end
     -- Text painted inside this text ends with its own closing codes, which would also end
     -- this spec's color or weight. Reopening this spec after each one keeps it going.
-    const nested = string.gsub(text, "\u{1b}%[([%d;:]*)m", function(parameters: string)
-        if Style.isClosing(parameters) then
-            return `\u{1b}[{parameters}m{opening}`
+    const nested = {}
+    for _, token in Text.tokens(text) do
+        table.insert(nested, token.Text)
+        const parameters = if token.Escape then string.match(token.Text, "^\u{1b}%[([%d;:]*)m$") else nil
+        if parameters and Style.isClosing(parameters) then
+            table.insert(nested, opening)
         end
-        return nil
-    end)
-    return `{opening}{nested}{closing}`
+    end
+    return `{opening}{table.concat(nested)}{closing}`
 end
 
 -- Returns true for escape parameters that only turn attributes off, such as "22;39".
@@ -281,7 +283,7 @@ end
 -- Removes ANSI escape sequences, which is useful for measuring or comparing output.
 function Style.strip(text: string): string
     assert(t.string(text))
-    return (string.gsub(text, Style.SgrPattern, ""))
+    return Text.strip(text)
 end
 
 return Style

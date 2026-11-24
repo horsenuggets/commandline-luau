@@ -205,6 +205,13 @@ return function()
             expect(Style.paint({}, "Done.", true)).to.equal("Done.")
         end)
 
+        it("should not interpret SGR bytes inside a control-string payload", function()
+            const payload = `\u{1b}Ppayload {ESCAPE}39m\u{1b}\\`
+            expect(Style.paint({ Color = "yellow" }, `{payload}text`, true)).to.equal(
+                `{ESCAPE}33m{payload}text{ESCAPE}39m`
+            )
+        end)
+
         it("should keep its own style after text painted inside it ends", function()
             const inner = Style.paint({ Color = "gray" }, "~/repo/", true)
             const outer = Style.paint({ Color = "yellow" }, `Cannot read {inner} today.`, true)

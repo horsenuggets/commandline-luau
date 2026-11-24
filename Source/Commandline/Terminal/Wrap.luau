@@ -9,37 +9,15 @@ timestamp. Contains no I/O.
 
 --]]
 
-const Style = require("./Style")
+const Text = require("./Text")
 const t = require("@packages/t")
-
-const ESCAPE_PATTERN = `^{Style.SgrPattern}`
 
 const Wrap = {}
 
 -- Returns the number of columns text takes once escape sequences are removed.
 function Wrap.width(text: string): number
     assert(t.string(text))
-    const visible = Style.strip(text)
-    return utf8.len(visible) or #visible
-end
-
--- Splits text into escape sequences and single characters, keeping multi-byte characters
--- whole so a split never lands inside one.
-const function tokens(text: string): { { Text: string, Width: number } }
-    const result = {}
-    local index = 1
-    while index <= #text do
-        const escape = string.match(text, ESCAPE_PATTERN, index)
-        if escape then
-            table.insert(result, { Text = escape, Width = 0 })
-            index += #escape
-        else
-            const character = string.match(text, utf8.charpattern, index) or string.sub(text, index, index)
-            table.insert(result, { Text = character, Width = 1 })
-            index += #character
-        end
-    end
-    return result
+    return Text.width(text)
 end
 
 --[[
@@ -82,7 +60,11 @@ function Wrap.line(text: string, columns: number, indent: string?): string
         end
         if currentWidth > indentWidth and currentWidth + spacesWidth + wordWidth > columns then
             -- Keep style changes from the dropped spaces, since they may open the word.
-            current ..= string.gsub(spaces, " ", "")
+            for _, token in Text.tokens(spaces) do
+                if token.Escape or token.Text ~= " " then
+                    current ..= token.Text
+                end
+            end
             breakLine()
         else
             current ..= spaces
@@ -91,7 +73,7 @@ function Wrap.line(text: string, columns: number, indent: string?): string
         spaces = ""
         spacesWidth = 0
         -- Only a word wider than a whole line is split, at the column edge.
-        for _, token in tokens(word) do
+        for _, token in Text.tokens(word) do
             if token.Width > 0 and currentWidth + token.Width > columns then
                 breakLine()
             end
@@ -102,7 +84,7 @@ function Wrap.line(text: string, columns: number, indent: string?): string
         wordWidth = 0
     end
 
-    for _, token in tokens(text) do
+    for _, token in Text.tokens(text) do
         if token.Text == " " then
             if wordWidth > 0 then
                 placeWord()

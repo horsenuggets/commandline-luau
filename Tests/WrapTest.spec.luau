@@ -24,6 +24,56 @@ return function()
         end)
     end)
 
+    describe("Terminal display columns", function()
+        it("should measure wide glyphs, combining marks, and emoji clusters", function()
+            for _, case in
+                {
+                    { "\u{754c}\u{754c}\u{754c}", 6 },
+                    { "e\u{301}e\u{301}", 2 },
+                    { "\u{1f469}\u{200d}\u{1f4bb}", 2 },
+                    { "\u{1f1fa}\u{1f1f8}", 2 },
+                    { "\u{1f44d}\u{1f3fd}", 2 },
+                    { "1\u{fe0f}\u{20e3}", 2 },
+                    { "\u{2764}\u{fe0e}", 1 },
+                    { "\u{2764}\u{fe0f}", 2 },
+                    { "\u{1100}\u{1161}", 2 },
+                }
+            do
+                expect(Wrap.width(case[1] :: string)).to.equal(case[2])
+            end
+        end)
+
+        it("should wrap between intact wide glyphs and emoji clusters", function()
+            const wide = "\u{754c}"
+            const emoji = "\u{1f469}\u{200d}\u{1f4bb}"
+            expect(Wrap.line(string.rep(wide, 3), 4)).to.equal(`{wide}{wide}\n{wide}`)
+            expect(Wrap.line(string.rep(emoji, 3), 4)).to.equal(`{emoji}{emoji}\n{emoji}`)
+            expect(Wrap.line("e\u{301}e\u{301}", 2)).to.equal("e\u{301}e\u{301}")
+        end)
+
+        it("should keep control strings and hyperlink URLs intact at zero width", function()
+            const opening = "\u{1b}]8;;https://example.com/a-long-link\u{1b}\\"
+            const closing = "\u{1b}]8;;\u{1b}\\"
+            const text = `Open {opening}docs{closing} now.`
+            const wrapped = Wrap.line(text, 9)
+            expect(Style.strip(wrapped)).to.equal("Open docs\nnow.")
+            expect(string.find(wrapped, opening, 1, true) ~= nil).to.equal(true)
+            expect(string.find(wrapped, closing, 1, true) ~= nil).to.equal(true)
+            for _, escape in
+                {
+                    "\u{1b}]0;A title with spaces\u{7}",
+                    "\u{1b}Ppayload with spaces\u{1b}\\",
+                    "\u{1b}_payload with spaces\u{1b}\\",
+                    "\u{1b}[2K",
+                }
+            do
+                expect(Wrap.width(`a{escape}b`)).to.equal(2)
+                expect(Style.strip(`a{escape}b`)).to.equal("ab")
+                expect(string.find(Wrap.line(`One {escape}two`, 3), escape, 1, true) ~= nil).to.equal(true)
+            end
+        end)
+    end)
+
     describe("Wrap.line", function()
         it("should leave lines that fit unchanged", function()
             expect(Wrap.line("One two three.", 14)).to.equal("One two three.")

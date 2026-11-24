@@ -63,6 +63,7 @@ export type Terminal = {
     default: () -> Terminal,
     setDefault: (terminal: Terminal) -> (),
     detectColumns: (os: string) -> number?,
+    localOffsetMinutes: (unixMillis: number) -> number,
     Address: (self: Terminal, address: string) -> string,
     Color: boolean,
     Columns: (self: Terminal) -> number,
@@ -110,6 +111,14 @@ Terminal.__index = Terminal
 
 local defaultTerminal: Terminal? = nil
 
+function Terminal.localOffsetMinutes(unixMillis: number): number
+    assert(t.number(unixMillis))
+    const instant = DateTime.fromUnixTimestamp(unixMillis / 1000)
+    -- Actual local components are unambiguous when reinterpreted as UTC. Reading UTC
+    -- components as local time instead can hit a DST gap or repeated hour.
+    return (DateTime.fromUniversalTime(instant:toLocalTime()).unixTimestamp - instant.unixTimestamp) // 60
+end
+
 const function systemClock(): Clock
     const started = os.clock()
     return {
@@ -117,10 +126,7 @@ const function systemClock(): Clock
             return os.clock() - started
         end,
         LocalOffsetMinutes = function()
-            -- Reading the UTC wall clock back as local time shifts it by the negated
-            -- offset, which also follows daylight saving changes.
-            const now = DateTime.now()
-            return -(DateTime.fromLocalTime(now:toUniversalTime()).unixTimestamp - now.unixTimestamp) // 60
+            return Terminal.localOffsetMinutes(DateTime.now().unixTimestampMillis)
         end,
         UnixMillis = function()
             return DateTime.now().unixTimestampMillis

@@ -7,8 +7,11 @@ text helpers, timestamped printing, and line buffering for streamed output.
 
 --]]
 
+const DateTime = require("@lune/datetime")
 const Style = require("../Source/Commandline/Terminal/Style")
 const Terminal = require("../Source/Commandline/Terminal")
+const fs = require("@lune/fs")
+const process = require("@lune/process")
 
 const Testable = require("@devpackages/Testable")
 const describe, expect, it = Testable.describe, Testable.expect, Testable.it
@@ -54,6 +57,51 @@ const function harness(config: Terminal.Config?): Harness
 end
 
 return function()
+    describe("Terminal.localOffsetMinutes", function()
+        it("should agree with the local offset at the actual instant", function()
+            const now = DateTime.now()
+            const offset = now:formatLocalTime("%z")
+            const sign, hours, minutes = string.match(offset, "^([+-])(%d%d)(%d%d)$")
+            assert(sign and hours and minutes)
+            const expected = ((tonumber(hours) :: number) * 60 + (tonumber(minutes) :: number))
+                * (if sign == "-" then -1 else 1)
+            expect(Terminal.localOffsetMinutes(now.unixTimestampMillis)).to.equal(expected)
+        end)
+
+        if process.os ~= "windows" then
+            it("should not interpret UTC wall-clock components in a DST gap or repeated hour", function()
+                const root = `Build/TerminalTimeTest-{os.time()}-{math.random(1, 1e9)}`
+                fs.writeDir(root)
+                const script = `{root}/Child.luau`
+                fs.writeFile(
+                    script,
+                    [[
+                    const DateTime = require("@lune/datetime")
+                    const Terminal = require("../../Source/Commandline/Terminal")
+                    for _, case in {
+                        { "2026-03-08T02:30:00Z", -300 },
+                        { "2026-03-08T04:30:00Z", -300 },
+                        { "2026-03-08T06:59:00Z", -300 },
+                        { "2026-03-08T07:00:00Z", -240 },
+                        { "2026-11-01T01:30:00Z", -240 },
+                        { "2026-11-01T04:30:00Z", -240 },
+                        { "2026-11-01T05:59:00Z", -240 },
+                        { "2026-11-01T06:00:00Z", -300 },
+                    } do
+                        const instant = DateTime.fromIsoDate(case[1])
+                        assert(Terminal.localOffsetMinutes(instant.unixTimestampMillis) == case[2], case[1])
+                    end
+                ]]
+                )
+                const ok, result = pcall(process.exec, "lune", { "run", script }, { env = { TZ = "America/New_York" } })
+                fs.removeDir(root)
+                assert(ok, tostring(result))
+                expect(result.stderr).to.equal("")
+                expect(result.ok).to.equal(true)
+            end)
+        end
+    end)
+
     describe("Terminal.new", function()
         it("should combine the app setting and environment override in every combination", function()
             -- False stands in for an unset value, since nil cannot sit inside an array.
