@@ -65,7 +65,7 @@ end
 function Timestamp.parse(spec: string): (Config?, string?)
     assert(t.string(spec))
 
-    const normalized = string.lower(string.gsub(spec, "%s", ""))
+    const normalized = string.lower((string.gsub(spec, "%s", "")))
     const named = (NAMED_SPECS :: { [string]: Mode })[normalized]
     if named then
         return table.freeze({ Mode = named }) :: Config, nil

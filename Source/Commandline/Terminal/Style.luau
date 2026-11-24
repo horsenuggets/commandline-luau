@@ -164,7 +164,7 @@ function Style.theme(overrides: ThemeOverrides?): Theme
     assert(t.optional(t.table)(overrides))
 
     const theme = table.clone(DEFAULT_THEME :: any)
-    for key, spec in overrides or {} do
+    for key, spec in pairs(overrides or {}) do
         if (DEFAULT_THEME :: any)[key] == nil then
             error(`Unknown theme key "{key}".`, 2)
         end
