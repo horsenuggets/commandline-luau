@@ -36,7 +36,7 @@ return function()
                     { "1\u{fe0f}\u{20e3}", 2 },
                     { "\u{2764}\u{fe0e}", 1 },
                     { "\u{2764}\u{fe0f}", 2 },
-                    { "\u{1100}\u{1161}", 2 },
+                    { "\u{1100}\u{1161}", 2 }
                 }
             do
                 expect(Wrap.width(case[1] :: string)).to.equal(case[2])
@@ -64,7 +64,7 @@ return function()
                     "\u{1b}]0;A title with spaces\u{7}",
                     "\u{1b}Ppayload with spaces\u{1b}\\",
                     "\u{1b}_payload with spaces\u{1b}\\",
-                    "\u{1b}[2K",
+                    "\u{1b}[2K"
                 }
             do
                 expect(Wrap.width(`a{escape}b`)).to.equal(2)

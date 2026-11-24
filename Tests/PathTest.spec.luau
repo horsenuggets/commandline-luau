@@ -45,7 +45,7 @@ return function()
                 { "Source\\AeCliTool", nil, true, "Source/AeCliTool/" },
                 { "Source//AeCliTool//", nil, true, "Source/AeCliTool/" },
                 { "\\\\server\\share\\file", "C:\\Users\\user", false, "//server/share/file" },
-                { "/", nil, true, "/" },
+                { "/", nil, true, "/" }
             }
             for _, case in cases do
                 expect(Path.display(case[1], case[2], case[3])).to.equal(case[4])

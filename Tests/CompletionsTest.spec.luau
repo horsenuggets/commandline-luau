@@ -24,9 +24,9 @@ const function makeSimpleCommand(): any
         Version = "1.0.0",
         Flags = {
             Flag.new({ Name = "verbose", Shorthand = "v", Description = "Enable verbose output." }),
-            Flag.new({ Name = "output", Shorthand = "o", Type = "string", Description = "Output file." }),
+            Flag.new({ Name = "output", Shorthand = "o", Type = "string", Description = "Output file." })
         },
-        Impl = function() end,
+        Impl = function() end
     })
 end
 
@@ -45,10 +45,10 @@ const function makeCommandWithSubcommands(): any
                         Name = "target",
                         Shorthand = "t",
                         Type = "string",
-                        Description = "Target platform.",
-                    }),
+                        Description = "Target platform."
+                    })
                 },
-                Impl = function() end,
+                Impl = function() end
             }),
             Command.new({
                 Name = "run",
@@ -58,17 +58,17 @@ const function makeCommandWithSubcommands(): any
                         Name = "port",
                         Shorthand = "p",
                         Type = "int",
-                        Description = "Server port.",
-                    }),
+                        Description = "Server port."
+                    })
                 },
-                Impl = function() end,
+                Impl = function() end
             }),
             Command.new({
                 Name = "init",
                 Description = "Initialize a new project.",
-                Impl = function() end,
-            }),
-        },
+                Impl = function() end
+            })
+        }
     })
 end
 
@@ -118,13 +118,13 @@ const function completeZsh(command: any, input: string): string
             zpty -d completion
             print -r -- "$output"
             [[ $output == *FINISHED* ]]
-        ]=],
+        ]=]
     }, {
         env = {
             TERM = "xterm-256color",
             TEST_FPATH = directory,
-            TEST_INPUT = input,
-        },
+            TEST_INPUT = input
+        }
     })
     fs.removeDir(directory)
     assert(ok, tostring(result))
@@ -141,7 +141,7 @@ return function()
             const cmd = Command.new({
                 Name = "outer",
                 Description = "Nested test tool.",
-                Subcommands = { makeCommandWithSubcommands() },
+                Subcommands = { makeCommandWithSubcommands() }
             })
             const fish = Completions.fish(cmd)
             expect(string.find(fish, 'complete -c outer -n "__outer_at_command exact mytool" -a "build"', 1, true)).to.be.ok()
@@ -262,9 +262,9 @@ return function()
                         Name = "open",
                         Description = [[It's a "quoted" C:\folder.]],
                         Flags = { Flag.new({ Name = "output", Description = [[It's a "quoted" C:\folder.]] }) },
-                        Impl = function() end,
-                    }),
-                },
+                        Impl = function() end
+                    })
+                }
             })
             const output = Completions.zsh(command)
             expect(string.find(output, [[It\'s a "quoted" C:\\folder.]], 1, true)).to.be.ok()
@@ -286,7 +286,7 @@ return function()
                 { Input = "mytool build --target -", Inserted = "mytool build --target -", Matches = 0 },
                 { Input = "mytool build -t Sour", Inserted = "mytool build -t Source", Matches = 1 },
                 { Input = "mytool build --target Sour", Inserted = "mytool build --target Source", Matches = 1 },
-                { Input = "mytool unknown Sour", Inserted = "mytool unknown Source", Matches = 1 },
+                { Input = "mytool unknown Sour", Inserted = "mytool unknown Source", Matches = 1 }
             }
         do
             shellTest(`should complete "{case.Input}" using zsh's real parser`, function()
@@ -300,7 +300,7 @@ return function()
             const command = Command.new({
                 Name = "outer",
                 Description = "Nested test tool.",
-                Subcommands = { makeCommandWithSubcommands() },
+                Subcommands = { makeCommandWithSubcommands() }
             })
             const output = completeZsh(command, "outer mytool build --ta")
             assert(string.find(output, "MATCHES=1", 1, true), output)
@@ -312,7 +312,7 @@ return function()
                 Name = "mytool",
                 Description = "A test tool.",
                 Flags = { Flag.new({ Name = "output", Type = "string", Description = "Output file." }) },
-                Impl = function() end,
+                Impl = function() end
             })
             const output = Completions.zsh(cmd)
             expect(string.find(output, "'--output[Output file.]:value:_files'", 1, true)).to.be.ok()
@@ -402,8 +402,8 @@ return function()
                 Name = "outer",
                 Description = "Test tool.",
                 Subcommands = {
-                    Command.new({ Name = "build", Description = "Build group.", Subcommands = { leaf } }),
-                },
+                    Command.new({ Name = "build", Description = "Build group.", Subcommands = { leaf } })
+                }
             })
             const output = Completions.fish(cmd)
             expect(string.find(output, '-n "__outer_at_command exact build" -a "build"', 1, true)).to.be.ok()
@@ -431,12 +431,12 @@ return function()
                                     Flag.new({
                                         Name = name .. "-output",
                                         Type = "string",
-                                        Description = "Output file.",
-                                    }),
+                                        Description = "Output file."
+                                    })
                                 },
-                                Impl = function() end,
-                            }),
-                        },
+                                Impl = function() end
+                            })
+                        }
                     })
                 )
             end

@@ -16,14 +16,14 @@ export type Flag = {
     Description: string,
     Type: TypeUtils.ArgType?,
     Shorthand: string?,
-    Default: any?,
+    Default: any?
 }
 export type FlagOptions = {
     Name: string,
     Description: string?,
     Type: TypeUtils.ArgType?,
     Shorthand: string?,
-    Default: any?,
+    Default: any?
 }
 
 const IFlagOptions = t.strictInterface({
@@ -31,7 +31,7 @@ const IFlagOptions = t.strictInterface({
     Description = t.optional(t.string),
     Type = t.optional(t.string),
     Shorthand = t.optional(t.string),
-    Default = t.optional(t.any),
+    Default = t.optional(t.any)
 })
 
 const Flag = {}

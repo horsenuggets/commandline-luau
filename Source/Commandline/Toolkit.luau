@@ -26,12 +26,12 @@ const buildOptionsCheck = t.interface({
     EntryPoint = t.string,
     OutputDir = t.optional(t.string),
     Target = t.optional(t.string),
-    Terminal = t.optional(t.table),
+    Terminal = t.optional(t.table)
 })
 
 const generateVersionCheck = t.interface({
     VersionFile = t.optional(t.string),
-    OutputPath = t.string,
+    OutputPath = t.string
 })
 
 ------------------------------------------------------------------------------------------
@@ -47,7 +47,7 @@ const generateVersionCheck = t.interface({
 ]]
 function Toolkit.generateVersion(options: {
     VersionFile: string?,
-    OutputPath: string,
+    OutputPath: string
 })
     assert(generateVersionCheck(options))
 
@@ -93,7 +93,7 @@ function Toolkit.build(options: {
     EntryPoint: string,
     OutputDir: string?,
     Target: string?,
-    Terminal: Terminal.Terminal?,
+    Terminal: Terminal.Terminal?
 })
     assert(buildOptionsCheck(options))
 
@@ -208,12 +208,12 @@ function Toolkit.completionsCommand(getRootCommand: () -> any): any
         Args = {
             Arg.new({
                 Name = "shell",
-                Description = "Shell type (bash, zsh, or fish).",
-            }),
+                Description = "Shell type (bash, zsh, or fish)."
+            })
         },
         Impl = function(args)
             print(Completions.generate(getRootCommand(), args.shell))
-        end,
+        end
     })
 end
 
@@ -230,7 +230,7 @@ end
 ]]
 function Toolkit.installCompletions(options: {
     Command: any,
-    Shell: string?,
+    Shell: string?
 })
     assert(t.table(options))
     assert(t.table(options.Command))
@@ -334,7 +334,7 @@ const installOptionsCheck = t.interface({
     Name = t.string,
     InstallDir = t.string,
     Version = t.string,
-    Repository = t.string,
+    Repository = t.string
 })
 
 --[[
@@ -358,7 +358,7 @@ function Toolkit.installCommand(options: {
     Name: string,
     InstallDir: string,
     Version: string,
-    Repository: string,
+    Repository: string
 }): any
     assert(installOptionsCheck(options))
 
@@ -381,7 +381,7 @@ function Toolkit.installCommand(options: {
     const SHELL_CONFIGS = {
         { file = ".bash_profile", shell = "bash" },
         { file = ".bashrc", shell = "bash" },
-        { file = ".zshrc", shell = "zsh" },
+        { file = ".zshrc", shell = "zsh" }
     }
     const XSH_PATH_FILE = HOME_DIR .. "/.path"
 
@@ -392,7 +392,7 @@ function Toolkit.installCommand(options: {
         const ok, response = pcall(net.request, {
             url = url,
             method = "GET",
-            headers = { ["User-Agent"] = name },
+            headers = { ["User-Agent"] = name }
         })
 
         if not ok or not response.ok then
@@ -418,7 +418,7 @@ function Toolkit.installCommand(options: {
         const dlOk, dlResponse = pcall(net.request, {
             url = downloadUrl,
             method = "GET",
-            headers = { ["User-Agent"] = name },
+            headers = { ["User-Agent"] = name }
         })
 
         if not dlOk or not dlResponse.ok then
@@ -504,7 +504,7 @@ function Toolkit.installCommand(options: {
             if currentExe then
                 SelfUpdate.copyBinary({
                     sourcePath = currentExe,
-                    targetPath = binaryPath,
+                    targetPath = binaryPath
                 })
                 terminal:Print(`Copied executable to {terminal:Path(binaryPath)}.`)
             else
@@ -518,7 +518,7 @@ function Toolkit.installCommand(options: {
                 end
                 SelfUpdate.replaceBinary({
                     targetPath = binaryPath,
-                    newContents = contents,
+                    newContents = contents
                 })
                 terminal:Print(terminal:Success("Downloaded successfully."))
             end
@@ -529,7 +529,7 @@ function Toolkit.installCommand(options: {
             terminal:Print()
             terminal:Print(terminal:Success("Installation complete!"))
             terminal:Print(terminal:Warning("Restart your terminal for PATH changes to take effect."))
-        end,
+        end
     })
 end
 
@@ -553,7 +553,7 @@ function Toolkit.updateCommand(options: {
     Name: string,
     InstallDir: string,
     Version: string,
-    Repository: string,
+    Repository: string
 }): any
     assert(installOptionsCheck(options))
 
@@ -577,7 +577,7 @@ function Toolkit.updateCommand(options: {
         const ok, response = pcall(net.request, {
             url = url,
             method = "GET",
-            headers = { ["User-Agent"] = name },
+            headers = { ["User-Agent"] = name }
         })
         if not ok or not response.ok then
             return nil
@@ -590,7 +590,7 @@ function Toolkit.updateCommand(options: {
 
         return {
             version = data.tag_name,
-            assets = data.assets or {},
+            assets = data.assets or {}
         }
     end
 
@@ -602,8 +602,8 @@ function Toolkit.updateCommand(options: {
                 Name = "version",
                 Shorthand = "v",
                 Description = "Install a specific version instead of the latest.",
-                Type = "string",
-            }),
+                Type = "string"
+            })
         },
         Impl = function(args)
             const terminal = Terminal.default()
@@ -658,7 +658,7 @@ function Toolkit.updateCommand(options: {
             const dlOk, dlResponse = pcall(net.request, {
                 url = downloadUrl,
                 method = "GET",
-                headers = { ["User-Agent"] = name },
+                headers = { ["User-Agent"] = name }
             })
 
             if not dlOk or not dlResponse.ok then
@@ -670,7 +670,7 @@ function Toolkit.updateCommand(options: {
             if currentExe then
                 SelfUpdate.replaceBinary({
                     targetPath = currentExe,
-                    newContents = dlResponse.body,
+                    newContents = dlResponse.body
                 })
             else
                 terminal:Print(
@@ -683,7 +683,7 @@ function Toolkit.updateCommand(options: {
 
             terminal:Print()
             terminal:Print(terminal:Success(`Updated to {terminal:Identifier(newVersion)}!`))
-        end,
+        end
     })
 end
 

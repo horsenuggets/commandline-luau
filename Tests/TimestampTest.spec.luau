@@ -36,7 +36,7 @@ return function()
                 { "Local", "Local" },
                 { "disabled", "Disabled" },
                 { "off", "Disabled" },
-                { "none", "Disabled" },
+                { "none", "Disabled" }
             }
             for _, case in cases do
                 const config = Timestamp.parse(case[1])
@@ -50,7 +50,7 @@ return function()
                 { "UTC-05:30", -330 },
                 { "+0530", 330 },
                 { "-8", -480 },
-                { "utc+14", 840 },
+                { "utc+14", 840 }
             }
             for _, case in cases do
                 const config = Timestamp.parse(case[1])
@@ -81,7 +81,7 @@ return function()
                 { 12.345, "00:|12.345" },
                 { 83.5, "0|1:23.500" },
                 { 754.9999, "|12:34.999" },
-                { 3723.004, "|1:02:03.004" },
+                { 3723.004, "|1:02:03.004" }
             }
             for _, case in cases do
                 expect(joined({ Mode = "Stopwatch" }, sample(case[1]))).to.equal(case[2])

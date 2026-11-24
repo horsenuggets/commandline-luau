@@ -54,7 +54,7 @@ export type Command = {
         isShorthand: boolean
     ) -> (number?, string?),
     _parsePositionalArgs: (self: Command, positionalArgs: { string }) -> ({ [string]: any }?, string?),
-    _printError: (self: Command, message: string) -> (),
+    _printError: (self: Command, message: string) -> ()
 }
 export type CommandlineOptions = {
     Name: string,
@@ -63,7 +63,7 @@ export type CommandlineOptions = {
     Args: { any }?,
     Flags: { any }?,
     Subcommands: { any }?,
-    Impl: ((args: { [string]: any }, flags: { [string]: { Value: any? } }) -> any)?,
+    Impl: ((args: { [string]: any }, flags: { [string]: { Value: any? } }) -> any)?
 }
 
 const ICommandlineOptions = t.strictInterface({
@@ -73,7 +73,7 @@ const ICommandlineOptions = t.strictInterface({
     Args = t.optional(t.array(t.any)),
     Flags = t.optional(t.array(t.any)),
     Subcommands = t.optional(t.array(t.any)),
-    Impl = t.optional(t.callback),
+    Impl = t.optional(t.callback)
 })
 const ITokens = t.array(t.string)
 
@@ -110,7 +110,7 @@ function Command.new(commandlineOptions: CommandlineOptions): Command
             Flag.new({
                 Name = "help",
                 Description = "Show help message.",
-                Shorthand = "h",
+                Shorthand = "h"
             })
         )
     end
@@ -134,7 +134,7 @@ function Command.new(commandlineOptions: CommandlineOptions): Command
                 Flag.new({
                     Name = "version",
                     Description = "Show version.",
-                    Shorthand = if hasVShorthand then nil else "v",
+                    Shorthand = if hasVShorthand then nil else "v"
                 })
             )
         end
@@ -246,7 +246,7 @@ function Command._makeHelpMessage(self: Command): string
         terminal:Paint("HelpDescription", self.Description),
         ``,
         `{terminal:Paint("Muted", `[{terminal:Paint("HelpHeading", `Usage`)}]`)}`,
-        usageLine,
+        usageLine
     }
     if self._commandPath == self.Name then
         table.insert(
