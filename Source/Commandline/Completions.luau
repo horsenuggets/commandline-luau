@@ -15,14 +15,14 @@ type Command = {
     Description: string,
     _args: { any },
     _flags: { any },
-    _subcommands: { Command },
+    _subcommands: { Command }
 }
 
 type Flag = {
     Name: string,
     Description: string,
     Type: string?,
-    Shorthand: string?,
+    Shorthand: string?
 }
 
 const Completions = {}
@@ -52,7 +52,7 @@ const function getFlagCompletions(flags: { Flag }): { string }
 end
 
 -- Helper to emit a line with shell variable interpolation (avoids {{ in backtick
--- strings which stylua cannot parse)
+-- strings which StyLuau cannot parse)
 const function shellVar(varName: string): string
     return "${" .. varName .. "}"
 end
