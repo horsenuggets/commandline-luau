@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.7
+
+- Added semantic terminal themes with configurable colors, attributes, and foreground opacity.
+- Added optional stopwatch, UTC, local, and fixed-offset timestamps with streamed output.
+- Normalized displayed paths, home prefixes, directory suffixes, and non-bold space dots.
+- Wrapped terminal prose while preserving wide glyphs, combining marks, and terminal escapes.
+- Kept local timestamp offsets correct through daylight saving gaps and repeated hours.
+- Styled build, install, update, and completion messages through the shared terminal.
+
 ## 0.2.6
 
 - Matched Zsh completion colors and compact spacing to CLI help output.
