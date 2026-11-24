@@ -289,6 +289,68 @@ return function()
             end
         end)
 
+        it("should suppress timestamps per write without changing styles, wrapping, or later output", function()
+            for _, color in { false, true } do
+                for _, timestamps in { "disabled", "stopwatch", "local" } do
+                    for _, wrap in { false, true } do
+                        const h = harness({ Color = color, Columns = 18, Timestamps = timestamps })
+                        const plain = harness({ Color = color, Columns = 18 })
+                        const setting = h.Terminal.Timestamps
+                        const clock = h.Terminal._clock
+                        const unreadClock = {
+                            Elapsed = function()
+                                error("Suppressed timestamps must not read elapsed time.")
+                            end,
+                            LocalOffsetMinutes = function()
+                                error("Suppressed timestamps must not read the local offset.")
+                            end,
+                            UnixMillis = function()
+                                error("Suppressed timestamps must not read wall-clock time.")
+                            end,
+                        }
+                        h.Terminal._clock = unreadClock
+                        const text = h.Terminal:Warning("One two three four five.\n\nSix seven eight nine.")
+                        h.Terminal:Print(text, { Timestamps = false, Wrap = wrap })
+                        h.Terminal:PrintError(text, { Timestamps = false, Wrap = wrap })
+                        plain.Terminal:Print(text, { Wrap = wrap })
+                        expect(table.concat(h.Output)).to.equal(table.concat(plain.Output))
+                        expect(table.concat(h.Errors)).to.equal(table.concat(plain.Output))
+                        expect(Style.strip(table.concat(h.Output))).to.equal(
+                            if wrap
+                                then "One two three four\nfive.\n\nSix seven eight\nnine.\n"
+                                else "One two three four five.\n\nSix seven eight nine.\n"
+                        )
+                        expect(h.Terminal.Timestamps).to.equal(setting)
+                        expect(h.Terminal._clock).to.equal(unreadClock)
+                        expect(h.Terminal:Columns()).to.equal(18)
+                        h.Terminal._clock = clock
+                        h.Advance(1.5)
+                        table.clear(h.Output)
+                        table.clear(h.Errors)
+                        const prefix = h.Terminal:Prefix()
+                        for _, options in { {}, { Timestamps = true } } do
+                            h.Terminal:Print("OK.", options)
+                            h.Terminal:PrintError("No.", options)
+                        end
+                        const stream = h.Terminal:Stream()
+                        stream.Write("OK.\n")
+                        stream.Flush()
+                        const expected = `{prefix}OK.\n`
+                        expect(Style.strip(table.concat(h.Output))).to.equal(Style.strip(string.rep(expected, 3)))
+                        expect(Style.strip(table.concat(h.Errors))).to.equal(
+                            Style.strip(string.rep(`{prefix}No.\n`, 2))
+                        )
+                        expect(Style.strip(prefix)).to.equal(
+                            if timestamps == "disabled"
+                                then ""
+                                elseif timestamps == "stopwatch" then "[00:01.500] "
+                                else "[13:05:09.042] "
+                        )
+                    end
+                end
+            end
+        end)
+
         it("should reject invalid print options", function()
             const terminal = harness().Terminal
             expect(function()
@@ -297,6 +359,14 @@ return function()
             expect(function()
                 terminal:PrintError("Text.", { Unknown = true } :: any)
             end).to.throw()
+            for _, value in { "false", 0, {} } do
+                expect(function()
+                    terminal:Print("Text.", { Timestamps = value } :: any)
+                end).to.throw()
+                expect(function()
+                    terminal:PrintError("Text.", { Timestamps = value } :: any)
+                end).to.throw()
+            end
         end)
 
         it("should wrap explicit-alpha timestamps using only their visible width", function()

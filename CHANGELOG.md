@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.9
+
+- Kept explicit, default, and error-following command help untimestamped and preformatted.
+- Added per-write timestamp suppression without changing terminal settings or clocks.
+- Preserved configured timestamps for diagnostics, versions, and subsequent output.
+
 ## 0.2.8
 
 - Applied configured terminal timestamps to command help, diagnostics, and version output.
