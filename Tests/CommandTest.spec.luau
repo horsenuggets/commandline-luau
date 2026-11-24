@@ -32,11 +32,13 @@ const CLOCK = {
 const function executeWithOutput(
     makeCommand: (typeof(Command)) -> Command.Command,
     tokens: { string },
-    config: Terminal.Config?
+    config: Terminal.Config?,
+    afterExecute: ((Command.Command) -> ())?
 ): (string, string, string)
     assert(t.callback(makeCommand))
     assert(t.array(t.string)(tokens))
     assert(t.optional(t.table)(config))
+    assert(t.optional(t.callback)(afterExecute))
 
     const combined = {}
     const output = {}
@@ -56,6 +58,9 @@ const function executeWithOutput(
     Terminal.setDefault(Terminal.new(options))
     const ok, problem = pcall(function()
         command:Execute(tokens)
+        if afterExecute then
+            afterExecute(command)
+        end
     end)
     Terminal.setDefault(previous)
     assert(ok, tostring(problem))
@@ -611,7 +616,7 @@ return function()
     end)
 
     describe("Command output", function()
-        it("should timestamp root and nested help without wrapping or changing its layout", function()
+        it("should leave root and nested help untimestamped without wrapping or changing its layout", function()
             for _, timestamps in { false, true } do
                 for _, nested in { false, true } do
                     const output, stdout, stderr = executeWithOutput(
@@ -639,15 +644,7 @@ return function()
                     const expected = if nested
                         then "Open a place without wrapping this long description.\n\n[Usage]\n> app open [flags...]\n\n[Flags]\n> -h, --help -- Show help message.\n"
                         else "app [1.2.3]\nManage places without wrapping this long description.\n\n[Usage]\n> app <subcommand>\n\n[Flags]\n> -h, --help -- Show help message.\n> -v, --version -- Show version.\n\n[Subcommands]\n> open -- Open a place without wrapping this long description.\n"
-                    const expectedLines = string.split(expected, "\n")
-                    if timestamps then
-                        for index, line in expectedLines do
-                            if line ~= "" then
-                                expectedLines[index] = `[00:00.000] {line}`
-                            end
-                        end
-                    end
-                    expect(Style.strip(output)).to.equal(table.concat(expectedLines, "\n"))
+                    expect(Style.strip(output)).to.equal(expected)
                     expect(stdout).to.equal(output)
                     expect(stderr).to.equal("")
                     expect(
@@ -664,6 +661,71 @@ return function()
                             true
                         )
                     ).to.be.ok()
+                end
+            end
+        end)
+
+        it("should keep every help path untimestamped and retain timestamps on subsequent output", function()
+            const cases = {
+                { Tokens = {}, Nested = false },
+                { Tokens = { "--help" }, Nested = false },
+                { Tokens = { "-h" }, Nested = false },
+                { Tokens = { "--unknown" }, Nested = false },
+                { Tokens = { "unknown" }, Nested = false },
+                { Tokens = { "group" }, Nested = true },
+                { Tokens = { "group", "--help" }, Nested = true },
+                { Tokens = { "group", "-h" }, Nested = true },
+                { Tokens = { "group", "--unknown" }, Nested = true },
+                { Tokens = { "group", "unknown" }, Nested = true },
+                { Tokens = { "group", "open" }, Nested = true },
+                { Tokens = { "group", "open", "one", "two" }, Nested = true },
+            }
+            for _, case in cases do
+                const _, stdout, stderr = executeWithOutput(
+                    function(command)
+                        return command.new({
+                            Name = "app",
+                            Version = "1.2.3",
+                            Subcommands = {
+                                command.new({
+                                    Name = "group",
+                                    Description = "Manage places.",
+                                    Subcommands = {
+                                        command.new({
+                                            Name = "open",
+                                            Description = "Open a place.",
+                                            Args = { Arg.new({ Name = "place" }) },
+                                        }),
+                                    },
+                                }),
+                            },
+                        })
+                    end,
+                    case.Tokens,
+                    {
+                        Clock = CLOCK,
+                        Color = false,
+                        Columns = 0,
+                        Timestamps = "stopwatch",
+                    },
+                    function(command)
+                        command:ShowHelp()
+                        command:Execute({ "--version" })
+                        Terminal.default():Print("Ready.")
+                        Terminal.default():PrintError("Later diagnostic.")
+                    end
+                )
+                const help, later = string.match(Style.strip(stdout), "^(.-)(%[00:00%.000%] 1%.2%.3.*)$")
+                assert(help and later)
+                expect(string.find(help, "[00:00.000]", 1, true)).to.equal(nil)
+                expect(string.sub(help, 1, 1)).to.equal(
+                    if case.Tokens[2] == "open" then "O" elseif case.Nested then "M" else "a"
+                )
+                expect(later).to.equal("[00:00.000] 1.2.3\n[00:00.000] Ready.\n")
+                for _, line in string.split(Style.strip(stderr), "\n") do
+                    if line ~= "" then
+                        expect(string.sub(line, 1, 12)).to.equal("[00:00.000] ")
+                    end
                 end
             end
         end)
@@ -694,7 +756,8 @@ return function()
                 Timestamps = "stopwatch",
             })
             expect(Style.strip(stderr)).to.equal("[00:00.000] Unknown flag --unknown.\n\n")
-            expect(Style.strip(stdout):sub(1, 16)).to.equal("[00:00.000] app\n")
+            expect(Style.strip(stdout):sub(1, 4)).to.equal("app\n")
+            expect(string.find(stdout, "[00:00.000]", 1, true)).to.equal(nil)
             expect(output).to.equal(`{stderr}{stdout}`)
             expect(string.find(stderr, Chalk.red(`Unknown flag {Chalk.bold("--unknown")}.`), 1, true)).to.be.ok()
         end)

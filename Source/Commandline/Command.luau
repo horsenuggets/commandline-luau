@@ -327,7 +327,7 @@ function Command._setCommandPath(self: Command, path: string)
 end
 
 function Command.ShowHelp(self: Command)
-    Terminal.default():Print(self._helpMessage, { Wrap = false })
+    Terminal.default():Print(self._helpMessage, { Timestamps = false, Wrap = false })
 end
 
 function Command._printError(self: Command, message: string)
