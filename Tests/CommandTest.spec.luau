@@ -11,43 +11,55 @@ const Arg = require("../Source/Commandline/Arg")
 const Chalk = require("@packages/Chalk")
 const Command = require("../Source/Commandline/Command")
 const Flag = require("../Source/Commandline/Flag")
-const StringUtils = require("../Source/Commandline/Helpers/StringUtils")
 const Style = require("../Source/Commandline/Terminal/Style")
-const TypeUtils = require("../Source/Commandline/Helpers/TypeUtils")
-const fs = require("@lune/fs")
-const luau = require("@lune/luau")
+const Terminal = require("../Source/Commandline/Terminal")
 const t = require("@packages/t")
 
 const Testable = require("@devpackages/Testable")
 const describe, expect, it = Testable.describe, Testable.expect, Testable.it
 
-const COMMAND_SOURCE = fs.readFile("Source/Commandline/Command.luau")
-const function executeWithOutput(makeCommand: (typeof(Command)) -> Command.Command, tokens: { string }): string
+const CLOCK = {
+    Elapsed = function()
+        return 0
+    end,
+    LocalOffsetMinutes = function()
+        return 0
+    end,
+    UnixMillis = function()
+        return 0
+    end,
+}
+const function executeWithOutput(
+    makeCommand: (typeof(Command)) -> Command.Command,
+    tokens: { string },
+    config: Terminal.Config?
+): (string, string, string)
     assert(t.callback(makeCommand))
     assert(t.array(t.string)(tokens))
+    assert(t.optional(t.table)(config))
 
+    const combined = {}
     const output = {}
-    const dependencies = {
-        ["./Arg"] = Arg,
-        ["./Flag"] = Flag,
-        ["./Helpers/StringUtils"] = StringUtils,
-        ["./Helpers/TypeUtils"] = TypeUtils,
-        ["./Terminal/Style"] = Style,
-        ["@packages/Chalk"] = Chalk,
-        ["@packages/t"] = t,
-    }
-    const isolatedCommand = luau.load(COMMAND_SOURCE, {
-        environment = {
-            print = function(message)
-                table.insert(output, `{message}\n`)
-            end,
-            require = function(path)
-                return assert(dependencies[path], `Unexpected dependency "{path}".`)
-            end,
-        },
-    })()
-    makeCommand(isolatedCommand):Execute(tokens)
-    return table.concat(output)
+    const errors = {}
+    const options: Terminal.Config = table.clone(config or {})
+    options.Env = options.Env or {}
+    options.Write = function(text)
+        table.insert(combined, text)
+        table.insert(output, text)
+    end
+    options.WriteError = function(text)
+        table.insert(combined, text)
+        table.insert(errors, text)
+    end
+    const previous = Terminal.default()
+    const command = makeCommand(Command)
+    Terminal.setDefault(Terminal.new(options))
+    const ok, problem = pcall(function()
+        command:Execute(tokens)
+    end)
+    Terminal.setDefault(previous)
+    assert(ok, tostring(problem))
+    return table.concat(combined), table.concat(output), table.concat(errors)
 end
 
 return function()
@@ -599,6 +611,94 @@ return function()
     end)
 
     describe("Command output", function()
+        it("should timestamp root and nested help without wrapping or changing its layout", function()
+            for _, timestamps in { false, true } do
+                for _, nested in { false, true } do
+                    const output, stdout, stderr = executeWithOutput(
+                        function(command)
+                            return command.new({
+                                Name = "app",
+                                Description = "Manage places without wrapping this long description.",
+                                Version = "1.2.3",
+                                Subcommands = {
+                                    command.new({
+                                        Name = "open",
+                                        Description = "Open a place without wrapping this long description.",
+                                    }),
+                                },
+                            })
+                        end,
+                        if nested then { "open", "--help" } else { "--help" },
+                        {
+                            Clock = CLOCK,
+                            Color = false,
+                            Columns = 12,
+                            Env = if timestamps then { COMMANDLINE_TIMESTAMPS = "stopwatch" } else {},
+                        }
+                    )
+                    const expected = if nested
+                        then "Open a place without wrapping this long description.\n\n[Usage]\n> app open [flags...]\n\n[Flags]\n> -h, --help -- Show help message.\n"
+                        else "app [1.2.3]\nManage places without wrapping this long description.\n\n[Usage]\n> app <subcommand>\n\n[Flags]\n> -h, --help -- Show help message.\n> -v, --version -- Show version.\n\n[Subcommands]\n> open -- Open a place without wrapping this long description.\n"
+                    const expectedLines = string.split(expected, "\n")
+                    if timestamps then
+                        for index, line in expectedLines do
+                            if line ~= "" then
+                                expectedLines[index] = `[00:00.000] {line}`
+                            end
+                        end
+                    end
+                    expect(Style.strip(output)).to.equal(table.concat(expectedLines, "\n"))
+                    expect(stdout).to.equal(output)
+                    expect(stderr).to.equal("")
+                    expect(
+                        string.find(
+                            output,
+                            Chalk.italic(
+                                Chalk.hex(Style.DefaultTheme.Muted.Color :: string)(
+                                    if nested
+                                        then "Open a place without wrapping this long description."
+                                        else "Manage places without wrapping this long description."
+                                )
+                            ),
+                            1,
+                            true
+                        )
+                    ).to.be.ok()
+                end
+            end
+        end)
+
+        it("should print both version flags to stdout using the current default terminal", function()
+            for _, timestamps in { false, true } do
+                for _, flag in { "--version", "-v" } do
+                    const output, stdout, stderr = executeWithOutput(function(command)
+                        return command.new({ Name = "app", Version = "1.2.3" })
+                    end, { flag }, {
+                        Clock = CLOCK,
+                        Color = false,
+                        Timestamps = if timestamps then "stopwatch" else nil,
+                    })
+                    expect(output).to.equal(if timestamps then "[00:00.000] 1.2.3\n" else "1.2.3\n")
+                    expect(stdout).to.equal(output)
+                    expect(stderr).to.equal("")
+                end
+            end
+        end)
+
+        it("should timestamp diagnostics on stderr and keep the separating blank line blank", function()
+            const output, stdout, stderr = executeWithOutput(function(command)
+                return command.new({ Name = "app", Description = "Manage places." })
+            end, { "--unknown" }, {
+                Clock = CLOCK,
+                Color = false,
+                Timestamps = "stopwatch",
+            })
+            expect(Style.strip(stderr)).to.equal("[00:00.000] Unknown flag --unknown.\n\n")
+            expect(Style.strip(stdout):sub(1, 16)).to.equal("[00:00.000] app\n")
+            expect(output).to.equal(`{stderr}{stdout}`)
+            expect(string.find(stderr, Chalk.red(`Unknown flag {Chalk.bold("--unknown")}.`), 1, true)).to.be.ok()
+        end)
+
         it("should print unlabelled red errors followed by one blank line before help", function()
             const cases = {
                 { Message = "Missing required args.", Tokens = { "open" } },
@@ -620,7 +720,7 @@ return function()
                 { Message = "Unknown subcommand unknown.", Tokens = { "unknown" } },
             }
             for _, case in cases do
-                const output = executeWithOutput(function(command)
+                const output, stdout, stderr = executeWithOutput(function(command)
                     return command.new({
                         Name = "app",
                         Description = "Manage places.",
@@ -635,6 +735,8 @@ return function()
                     })
                 end, case.Tokens)
                 const lines = string.split(Style.strip(output), "\n")
+                expect(Style.strip(stderr)).to.equal(`{case.Message}\n\n`)
+                expect(output).to.equal(`{stderr}{stdout}`)
                 expect(lines[1]).to.equal(case.Message)
                 expect(lines[2]).to.equal("")
                 expect(lines[3]).to.equal(if case.Tokens[1] == "open" then "Open a place." else "app")
