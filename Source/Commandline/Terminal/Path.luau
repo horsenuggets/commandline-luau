@@ -14,7 +14,7 @@ const ROBLOX_EXTENSIONS = {
     rbxl = true,
     rbxlx = true,
     rbxm = true,
-    rbxmx = true,
+    rbxmx = true
 }
 
 const Path = {}
@@ -28,7 +28,7 @@ function Path.home(os: string, env: { [string]: string? }): string?
         then {
             env.USERPROFILE,
             if env.HOMEDRIVE and env.HOMEPATH then `{env.HOMEDRIVE}{env.HOMEPATH}` else nil,
-            env.HOME,
+            env.HOME
         }
         else { env.HOME }
     for _, candidate in candidates do

@@ -26,7 +26,7 @@ function ZshCompletionDemo.exec()
             Commandline.Command.new({
                 Name = "edit",
                 Description = "Open a temporary place that stays synced to Source/.",
-                Impl = function() end,
+                Impl = function() end
             }),
             Commandline.Command.new({
                 Name = "setup",
@@ -40,29 +40,29 @@ function ZshCompletionDemo.exec()
                                 Name = "editor",
                                 Shorthand = "e",
                                 Type = "string",
-                                Description = "Name or path of the editor command line tool.",
+                                Description = "Name or path of the editor command line tool."
                             }),
                             Commandline.Flag.new({
                                 Name = "force",
                                 Shorthand = "f",
-                                Description = "Reinstall even when already installed.",
-                            }),
+                                Description = "Reinstall even when already installed."
+                            })
                         },
-                        Impl = function() end,
-                    }),
-                },
+                        Impl = function() end
+                    })
+                }
             }),
             Commandline.Command.new({
                 Name = "teamcreate",
                 Description = "Open the Team Create place in Studio.",
-                Impl = function() end,
+                Impl = function() end
             }),
             Commandline.Command.new({
                 Name = "update",
                 Description = "Rebuild ae and reinstall the Studio plugins from your checkout.",
-                Impl = function() end,
-            }),
-        },
+                Impl = function() end
+            })
+        }
     })
     const completion = Commandline.Completions.zsh(command)
     const sessionDir = `{tostring(project)}/Build/ZshCompletionDemo/{os.time()}-{math.random(1, 1e9)}`
@@ -96,9 +96,9 @@ function ZshCompletionDemo.exec()
         env = {
             ZDOTDIR = sessionDir,
             COMMANDLINE_DEMO_COMPLETION = completion,
-            COMMANDLINE_DEMO_HELP = command._helpMessage,
+            COMMANDLINE_DEMO_HELP = command._helpMessage
         },
-        stdio = "inherit",
+        stdio = "inherit"
     })
     fs.removeDir(sessionDir)
     assert(ok, tostring(result))

@@ -27,7 +27,7 @@ const CLOCK = {
     end,
     UnixMillis = function()
         return 0
-    end,
+    end
 }
 const function executeWithOutput(
     makeCommand: (typeof(Command)) -> Command.Command,
@@ -71,7 +71,7 @@ return function()
     describe("Command.new", function()
         it("should create a basic Command with required fields", function()
             const cmd = Command.new({
-                Name = "test",
+                Name = "test"
             })
             expect(cmd).to.be.ok()
             expect(cmd.Name).to.equal("test")
@@ -83,7 +83,7 @@ return function()
             const cmd = Command.new({
                 Name = "build",
                 Description = "Build the project",
-                Version = "1.0.0",
+                Version = "1.0.0"
             })
             expect(cmd.Name).to.equal("build")
             expect(cmd.Description).to.equal("Build the project")
@@ -92,7 +92,7 @@ return function()
 
         it("should automatically add help Flag", function()
             const cmd = Command.new({
-                Name = "test",
+                Name = "test"
             })
             expect(#cmd._flags).to.equal(1)
             expect(cmd._flags[1].Name).to.equal("help")
@@ -105,9 +105,9 @@ return function()
                 Flags = {
                     Flag.new({
                         Name = "help",
-                        Description = "Custom help",
-                    }),
-                },
+                        Description = "Custom help"
+                    })
+                }
             })
             expect(#cmd._flags).to.equal(1)
         end)
@@ -115,7 +115,7 @@ return function()
         it("should automatically add version Flag when Version is set", function()
             const cmd = Command.new({
                 Name = "test",
-                Version = "1.0.0",
+                Version = "1.0.0"
             })
             local hasVersion = false
             for _, flag in cmd._flags do
@@ -129,7 +129,7 @@ return function()
 
         it("should not add version Flag when Version is not set", function()
             const cmd = Command.new({
-                Name = "test",
+                Name = "test"
             })
             for _, flag in cmd._flags do
                 expect(flag.Name).never.to.equal("version")
@@ -143,9 +143,9 @@ return function()
                 Flags = {
                     Flag.new({
                         Name = "version",
-                        Description = "Custom version",
-                    }),
-                },
+                        Description = "Custom version"
+                    })
+                }
             })
             local versionCount = 0
             for _, flag in cmd._flags do
@@ -161,8 +161,8 @@ return function()
                 Name = "test",
                 Version = "1.0.0",
                 Flags = {
-                    Flag.new({ Name = "verbose", Shorthand = "v" }),
-                },
+                    Flag.new({ Name = "verbose", Shorthand = "v" })
+                }
             })
             for _, flag in cmd._flags do
                 if flag.Name == "version" then
@@ -173,7 +173,7 @@ return function()
 
         it("should convert command name to lowercase", function()
             const cmd = Command.new({
-                Name = "TestCommand",
+                Name = "TestCommand"
             })
             expect(cmd.Name).to.equal("testcommand")
         end)
@@ -218,8 +218,8 @@ return function()
                 Name = "copy",
                 Args = {
                     Arg.new({ Name = "source" }),
-                    Arg.new({ Name = "destination" }),
-                },
+                    Arg.new({ Name = "destination" })
+                }
             })
             expect(#cmd._args).to.equal(2)
             expect(cmd._args[1].Name).to.equal("source")
@@ -231,8 +231,8 @@ return function()
                 Name = "build",
                 Flags = {
                     Flag.new({ Name = "verbose", Shorthand = "v" }),
-                    Flag.new({ Name = "output", Type = "string" }),
-                },
+                    Flag.new({ Name = "output", Type = "string" })
+                }
             })
             expect(#cmd._flags).to.equal(3)
         end)
@@ -243,8 +243,8 @@ return function()
                     Name = "test",
                     Args = {
                         Arg.new({ Name = "file" }),
-                        Arg.new({ Name = "file" }),
-                    },
+                        Arg.new({ Name = "file" })
+                    }
                 })
             end).to.throw()
         end)
@@ -255,8 +255,8 @@ return function()
                     Name = "test",
                     Flags = {
                         Flag.new({ Name = "verbose" }),
-                        Flag.new({ Name = "verbose" }),
-                    },
+                        Flag.new({ Name = "verbose" })
+                    }
                 })
             end).to.throw()
         end)
@@ -267,8 +267,8 @@ return function()
                     Name = "test",
                     Flags = {
                         Flag.new({ Name = "verbose", Shorthand = "v" }),
-                        Flag.new({ Name = "version", Shorthand = "v" }),
-                    },
+                        Flag.new({ Name = "version", Shorthand = "v" })
+                    }
                 })
             end).to.throw()
         end)
@@ -279,8 +279,8 @@ return function()
                     Name = "test",
                     Args = {
                         Arg.new({ Name = "optional", Required = false }),
-                        Arg.new({ Name = "required", Required = true }),
-                    },
+                        Arg.new({ Name = "required", Required = true })
+                    }
                 })
             end).to.throw()
         end)
@@ -290,8 +290,8 @@ return function()
                 Name = "test",
                 Args = {
                     Arg.new({ Name = "required", Required = true }),
-                    Arg.new({ Name = "optional", Required = false }),
-                },
+                    Arg.new({ Name = "optional", Required = false })
+                }
             })
             expect(#cmd._args).to.equal(2)
         end)
@@ -302,7 +302,7 @@ return function()
                 Name = "test",
                 Impl = function()
                     _executed = true
-                end,
+                end
             })
             expect(cmd._impl).to.be.ok()
         end)
@@ -312,8 +312,8 @@ return function()
                 Name = "git",
                 Subcommands = {
                     Command.new({ Name = "add" }),
-                    Command.new({ Name = "commit" }),
-                },
+                    Command.new({ Name = "commit" })
+                }
             })
             expect(#cmd._subcommands).to.equal(2)
             expect(cmd._subcommands[1].Name).to.equal("add")
@@ -326,8 +326,8 @@ return function()
                     Name = "test",
                     Subcommands = {
                         Command.new({ Name = "sub" }),
-                        Command.new({ Name = "sub" }),
-                    },
+                        Command.new({ Name = "sub" })
+                    }
                 })
             end).to.throw()
         end)
@@ -337,11 +337,11 @@ return function()
                 Command.new({
                     Name = "test",
                     Subcommands = {
-                        Command.new({ Name = "sub" }),
+                        Command.new({ Name = "sub" })
                     },
                     Args = {
-                        Arg.new({ Name = "arg" }),
-                    },
+                        Arg.new({ Name = "arg" })
+                    }
                 })
             end).to.throw()
         end)
@@ -351,11 +351,11 @@ return function()
                 Command.new({
                     Name = "test",
                     Subcommands = {
-                        Command.new({ Name = "sub" }),
+                        Command.new({ Name = "sub" })
                     },
                     Flags = {
-                        Flag.new({ Name = "custom" }),
-                    },
+                        Flag.new({ Name = "custom" })
+                    }
                 })
             end).to.throw()
         end)
@@ -365,9 +365,9 @@ return function()
                 Command.new({
                     Name = "test",
                     Subcommands = {
-                        Command.new({ Name = "sub" }),
+                        Command.new({ Name = "sub" })
                     },
-                    Impl = function() end,
+                    Impl = function() end
                 })
             end).to.throw()
         end)
@@ -376,7 +376,7 @@ return function()
             expect(function()
                 Command.new({
                     Name = "test",
-                    Args = { "not an Arg" },
+                    Args = { "not an Arg" }
                 })
             end).to.throw()
         end)
@@ -385,7 +385,7 @@ return function()
             expect(function()
                 Command.new({
                     Name = "test",
-                    Flags = { "not a Flag" },
+                    Flags = { "not a Flag" }
                 })
             end).to.throw()
         end)
@@ -394,7 +394,7 @@ return function()
             expect(function()
                 Command.new({
                     Name = "test",
-                    Subcommands = { "not a Command" },
+                    Subcommands = { "not a Command" }
                 })
             end).to.throw()
         end)
@@ -407,7 +407,7 @@ return function()
                 Name = "test",
                 Impl = function()
                     executed = true
-                end,
+                end
             })
             cmd:Execute({})
             expect(executed).to.equal(true)
@@ -418,11 +418,11 @@ return function()
             const cmd = Command.new({
                 Name = "greet",
                 Args = {
-                    Arg.new({ Name = "name", Type = "string" }),
+                    Arg.new({ Name = "name", Type = "string" })
                 },
                 Impl = function(args)
                     receivedArgs = args
-                end,
+                end
             })
             cmd:Execute({ "Alice" })
             expect(receivedArgs).to.be.ok()
@@ -435,11 +435,11 @@ return function()
                 Name = "add",
                 Args = {
                     Arg.new({ Name = "a", Type = "int" }),
-                    Arg.new({ Name = "b", Type = "int" }),
+                    Arg.new({ Name = "b", Type = "int" })
                 },
                 Impl = function(args)
                     receivedArgs = args
-                end,
+                end
             })
             cmd:Execute({ "10", "20" })
             expect(receivedArgs.a).to.equal(10)
@@ -451,11 +451,11 @@ return function()
             const cmd = Command.new({
                 Name = "test",
                 Flags = {
-                    Flag.new({ Name = "verbose", Shorthand = "v" }),
+                    Flag.new({ Name = "verbose", Shorthand = "v" })
                 },
                 Impl = function(args, flags)
                     receivedFlags = flags
-                end,
+                end
             })
             cmd:Execute({ "--verbose" })
             expect(receivedFlags.verbose.Value).to.equal(true)
@@ -466,11 +466,11 @@ return function()
             const cmd = Command.new({
                 Name = "test",
                 Flags = {
-                    Flag.new({ Name = "verbose", Shorthand = "v" }),
+                    Flag.new({ Name = "verbose", Shorthand = "v" })
                 },
                 Impl = function(args, flags)
                     receivedFlags = flags
-                end,
+                end
             })
             cmd:Execute({ "-v" })
             expect(receivedFlags.verbose.Value).to.equal(true)
@@ -481,11 +481,11 @@ return function()
             const cmd = Command.new({
                 Name = "test",
                 Flags = {
-                    Flag.new({ Name = "port", Type = "int" }),
+                    Flag.new({ Name = "port", Type = "int" })
                 },
                 Impl = function(args, flags)
                     receivedFlags = flags
-                end,
+                end
             })
             cmd:Execute({ "--port", "8080" })
             expect(receivedFlags.port.Value).to.equal(8080)
@@ -496,11 +496,11 @@ return function()
             const cmd = Command.new({
                 Name = "test",
                 Flags = {
-                    Flag.new({ Name = "port", Type = "int", Default = 3000 }),
+                    Flag.new({ Name = "port", Type = "int", Default = 3000 })
                 },
                 Impl = function(args, flags)
                     receivedFlags = flags
-                end,
+                end
             })
             cmd:Execute({})
             expect(receivedFlags.port.Value).to.equal(3000)
@@ -511,11 +511,11 @@ return function()
             const cmd = Command.new({
                 Name = "test",
                 Args = {
-                    Arg.new({ Name = "count", Type = "int", Required = false, Default = 5 }),
+                    Arg.new({ Name = "count", Type = "int", Required = false, Default = 5 })
                 },
                 Impl = function(args)
                     receivedArgs = args
-                end,
+                end
             })
             cmd:Execute({})
             expect(receivedArgs.count).to.equal(5)
@@ -526,16 +526,16 @@ return function()
             const cmd = Command.new({
                 Name = "build",
                 Args = {
-                    Arg.new({ Name = "target", Type = "string" }),
+                    Arg.new({ Name = "target", Type = "string" })
                 },
                 Flags = {
                     Flag.new({ Name = "verbose", Shorthand = "v" }),
-                    Flag.new({ Name = "output", Type = "string" }),
+                    Flag.new({ Name = "output", Type = "string" })
                 },
                 Impl = function(args, flags)
                     receivedArgs = args
                     receivedFlags = flags
-                end,
+                end
             })
             cmd:Execute({ "--verbose", "production", "--output", "dist" })
             expect(receivedArgs.target).to.equal("production")
@@ -552,9 +552,9 @@ return function()
                         Name = "status",
                         Impl = function()
                             subExecuted = true
-                        end,
-                    }),
-                },
+                        end
+                    })
+                }
             })
             cmd:Execute({ "status" })
             expect(subExecuted).to.equal(true)
@@ -568,13 +568,13 @@ return function()
                     Command.new({
                         Name = "add",
                         Args = {
-                            Arg.new({ Name = "file" }),
+                            Arg.new({ Name = "file" })
                         },
                         Impl = function(args)
                             receivedArgs = args
-                        end,
-                    }),
-                },
+                        end
+                    })
+                }
             })
             cmd:Execute({ "add", "test.txt" })
             expect(receivedArgs.file).to.equal("test.txt")
@@ -587,7 +587,7 @@ return function()
                 Version = "1.2.3",
                 Impl = function()
                     executed = true
-                end,
+                end
             })
             cmd:Execute({ "--version" })
             expect(executed).to.equal(false)
@@ -600,7 +600,7 @@ return function()
                 Version = "1.2.3",
                 Impl = function()
                     executed = true
-                end,
+                end
             })
             cmd:Execute({ "-v" })
             expect(executed).to.equal(false)
@@ -609,7 +609,7 @@ return function()
         it("should throw error for invalid tokens", function()
             expect(function()
                 Command.new({
-                    Name = "test",
+                    Name = "test"
                 }):Execute("not a table" :: any)
             end).to.throw()
         end)
@@ -628,9 +628,9 @@ return function()
                                 Subcommands = {
                                     command.new({
                                         Name = "open",
-                                        Description = "Open a place without wrapping this long description.",
-                                    }),
-                                },
+                                        Description = "Open a place without wrapping this long description."
+                                    })
+                                }
                             })
                         end,
                         if nested then { "open", "--help" } else { "--help" },
@@ -638,7 +638,7 @@ return function()
                             Clock = CLOCK,
                             Color = false,
                             Columns = 12,
-                            Env = if timestamps then { COMMANDLINE_TIMESTAMPS = "stopwatch" } else {},
+                            Env = if timestamps then { COMMANDLINE_TIMESTAMPS = "stopwatch" } else {}
                         }
                     )
                     const expected = if nested
@@ -678,7 +678,7 @@ return function()
                 { Tokens = { "group", "--unknown" }, Nested = true },
                 { Tokens = { "group", "unknown" }, Nested = true },
                 { Tokens = { "group", "open" }, Nested = true },
-                { Tokens = { "group", "open", "one", "two" }, Nested = true },
+                { Tokens = { "group", "open", "one", "two" }, Nested = true }
             }
             for _, case in cases do
                 const _, stdout, stderr = executeWithOutput(
@@ -694,11 +694,11 @@ return function()
                                         command.new({
                                             Name = "open",
                                             Description = "Open a place.",
-                                            Args = { Arg.new({ Name = "place" }) },
-                                        }),
-                                    },
-                                }),
-                            },
+                                            Args = { Arg.new({ Name = "place" }) }
+                                        })
+                                    }
+                                })
+                            }
                         })
                     end,
                     case.Tokens,
@@ -706,7 +706,7 @@ return function()
                         Clock = CLOCK,
                         Color = false,
                         Columns = 0,
-                        Timestamps = "stopwatch",
+                        Timestamps = "stopwatch"
                     },
                     function(command)
                         command:ShowHelp()
@@ -738,7 +738,7 @@ return function()
                     end, { flag }, {
                         Clock = CLOCK,
                         Color = false,
-                        Timestamps = if timestamps then "stopwatch" else nil,
+                        Timestamps = if timestamps then "stopwatch" else nil
                     })
                     expect(output).to.equal(if timestamps then "[00:00.000] 1.2.3\n" else "1.2.3\n")
                     expect(stdout).to.equal(output)
@@ -753,7 +753,7 @@ return function()
             end, { "--unknown" }, {
                 Clock = CLOCK,
                 Color = false,
-                Timestamps = "stopwatch",
+                Timestamps = "stopwatch"
             })
             expect(Style.strip(stderr)).to.equal("[00:00.000] Unknown flag --unknown.\n\n")
             expect(Style.strip(stdout):sub(1, 4)).to.equal("app\n")
@@ -774,13 +774,13 @@ return function()
                 { Message = "flag -c requires a value.", Tokens = { "open", "-c" } },
                 {
                     Message = 'flag --count - Unable to cast "bad" to int. Not a valid number.',
-                    Tokens = { "open", "--count", "bad" },
+                    Tokens = { "open", "--count", "bad" }
                 },
                 {
                     Message = 'flag -c - Unable to cast "bad" to int. Not a valid number.',
-                    Tokens = { "open", "-c", "bad" },
+                    Tokens = { "open", "-c", "bad" }
                 },
-                { Message = "Unknown subcommand unknown.", Tokens = { "unknown" } },
+                { Message = "Unknown subcommand unknown.", Tokens = { "unknown" } }
             }
             for _, case in cases do
                 const output, stdout, stderr = executeWithOutput(function(command)
@@ -792,9 +792,9 @@ return function()
                                 Name = "open",
                                 Description = "Open a place.",
                                 Args = { Arg.new({ Name = "place" }) },
-                                Flags = { Flag.new({ Name = "count", Shorthand = "c", Type = "int" }) },
-                            }),
-                        },
+                                Flags = { Flag.new({ Name = "count", Shorthand = "c", Type = "int" }) }
+                            })
+                        }
                     })
                 end, case.Tokens)
                 const lines = string.split(Style.strip(output), "\n")
@@ -812,7 +812,7 @@ return function()
             const output = executeWithOutput(function(command)
                 return command.new({
                     Name = "app",
-                    Subcommands = { command.new({ Name = "open", Description = "Open a place." }) },
+                    Subcommands = { command.new({ Name = "open", Description = "Open a place." }) }
                 })
             end, { "open", "--help" })
             expect(string.split(Style.strip(output), "\n")[1]).to.equal("Open a place.")
@@ -825,7 +825,7 @@ return function()
                 const cmd = Command.new({
                     Name = "app",
                     Description = "Manage places.",
-                    Version = if version == "" then nil else version,
+                    Version = if version == "" then nil else version
                 })
                 const lines = string.split(Style.strip(cmd._helpMessage), "\n")
                 expect(lines[1]).to.equal(if version == "" then "app" else "app [1.2.3]")
@@ -841,7 +841,7 @@ return function()
                 Name = "app",
                 Description = "Manage places.",
                 Version = "1.2.3",
-                Subcommands = { Command.new({ Name = "open", Description = "Open a place." }) },
+                Subcommands = { Command.new({ Name = "open", Description = "Open a place." }) }
             })
             const muted = Chalk.hex(Style.DefaultTheme.Muted.Color :: string)
             expect(string.find(cmd._helpMessage, Chalk.italic(muted(cmd.Description)), 1, true)).to.be.ok()
@@ -852,7 +852,7 @@ return function()
         it("should generate help message", function()
             const cmd = Command.new({
                 Name = "test",
-                Description = "A test command",
+                Description = "A test command"
             })
             cmd:ShowHelp()
         end)
@@ -861,11 +861,11 @@ return function()
             const sub = Command.new({
                 Name = "status",
                 Description = "Show status.",
-                Impl = function() end,
+                Impl = function() end
             })
             Command.new({
                 Name = "git",
-                Subcommands = { sub },
+                Subcommands = { sub }
             })
             expect(sub._commandPath).to.equal("git status")
         end)
@@ -874,16 +874,16 @@ return function()
             const leaf = Command.new({
                 Name = "list",
                 Description = "List items.",
-                Impl = function() end,
+                Impl = function() end
             })
             const middle = Command.new({
                 Name = "api-key",
                 Description = "Manage API keys.",
-                Subcommands = { leaf },
+                Subcommands = { leaf }
             })
             Command.new({
                 Name = "app",
-                Subcommands = { middle },
+                Subcommands = { middle }
             })
             expect(middle._commandPath).to.equal("app api-key")
             expect(leaf._commandPath).to.equal("app api-key list")
@@ -901,11 +901,11 @@ return function()
             const sub = Command.new({
                 Name = "deploy",
                 Description = "Deploy the app.",
-                Impl = function() end,
+                Impl = function() end
             })
             Command.new({
                 Name = "myapp",
-                Subcommands = { sub },
+                Subcommands = { sub }
             })
             expect(string.find(sub._helpMessage, "myapp deploy", 1, true)).to.be.ok()
         end)

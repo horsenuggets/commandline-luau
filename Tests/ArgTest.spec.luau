@@ -26,7 +26,7 @@ return function()
         it("should create an Arg with custom description", function()
             const arg = Arg.new({
                 Name = "testarg",
-                Description = "A test argument",
+                Description = "A test argument"
             })
             expect(arg.Description).to.equal("A test argument")
         end)
@@ -48,7 +48,7 @@ return function()
         it("should create an optional Arg when Required is false", function()
             const arg = Arg.new({
                 Name = "optional",
-                Required = false,
+                Required = false
             })
             expect(arg.Required).to.equal(false)
         end)
@@ -58,7 +58,7 @@ return function()
                 Name = "count",
                 Type = "int",
                 Required = false,
-                Default = 10,
+                Default = 10
             })
             expect(arg.Required).to.equal(false)
             expect(arg.Default).to.equal(10)
@@ -68,7 +68,7 @@ return function()
             expect(function()
                 Arg.new({
                     Name = "test",
-                    Type = "invalid",
+                    Type = "invalid"
                 })
             end).to.throw()
         end)
@@ -79,7 +79,7 @@ return function()
                     Name = "test",
                     Type = "int",
                     Required = false,
-                    Default = "not a number",
+                    Default = "not a number"
                 })
             end).to.throw()
         end)
@@ -89,7 +89,7 @@ return function()
                 Arg.new({
                     Name = "test",
                     Required = true,
-                    Default = "value",
+                    Default = "value"
                 })
             end).to.throw()
         end)
@@ -99,7 +99,7 @@ return function()
                 Name = "count",
                 Type = "int",
                 Required = false,
-                Default = 5,
+                Default = 5
             })
             expect(arg.Default).to.equal(5)
 
@@ -108,7 +108,7 @@ return function()
                     Name = "count",
                     Type = "int",
                     Required = false,
-                    Default = 3.14,
+                    Default = 3.14
                 })
             end).to.throw()
         end)
@@ -118,7 +118,7 @@ return function()
                 Name = "flag",
                 Type = "boolean",
                 Required = false,
-                Default = true,
+                Default = true
             })
             expect(arg.Default).to.equal(true)
 
@@ -127,7 +127,7 @@ return function()
                     Name = "flag",
                     Type = "boolean",
                     Required = false,
-                    Default = "true",
+                    Default = "true"
                 })
             end).to.throw()
         end)
@@ -137,7 +137,7 @@ return function()
                 Name = "value",
                 Type = "number",
                 Required = false,
-                Default = 3.14,
+                Default = 3.14
             })
             expect(arg.Default).to.equal(3.14)
 
@@ -146,7 +146,7 @@ return function()
                     Name = "value",
                     Type = "number",
                     Required = false,
-                    Default = "3.14",
+                    Default = "3.14"
                 })
             end).to.throw()
         end)
@@ -156,7 +156,7 @@ return function()
                 Name = "text",
                 Type = "string",
                 Required = false,
-                Default = "hello",
+                Default = "hello"
             })
             expect(arg.Default).to.equal("hello")
 
@@ -165,7 +165,7 @@ return function()
                     Name = "text",
                     Type = "string",
                     Required = false,
-                    Default = 123,
+                    Default = 123
                 })
             end).to.throw()
         end)
@@ -183,7 +183,7 @@ return function()
         it("should throw error when Name is missing", function()
             expect(function()
                 Arg.new({
-                    Description = "Missing name",
+                    Description = "Missing name"
                 } :: any)
             end).to.throw()
         end)
