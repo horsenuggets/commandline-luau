@@ -14,16 +14,20 @@ const process = require("@lune/process")
 const t = require("@packages/t")
 
 const Completions = require("@self/Completions")
+const SelfUpdate = require("@self/SelfUpdate")
+const Terminal = require("@self/Terminal")
 
 const Toolkit = {}
 
 -- Validation types
 
 const buildOptionsCheck = t.interface({
+    DisplayName = t.optional(t.string),
     Name = t.string,
     EntryPoint = t.string,
     OutputDir = t.optional(t.string),
     Target = t.optional(t.string),
+    Terminal = t.optional(t.table),
 })
 
 const generateVersionCheck = t.interface({
@@ -75,30 +79,35 @@ end
     Builds a standalone executable from a Lune entry point.
 
     Options:
+    > DisplayName - Name shown in the build heading (default Name)
     > Name - Output binary name (e.g., "luauproject")
     > EntryPoint - Path to the entry point directory or file
     > OutputDir - Directory to write the binary (default "Build")
     > Target - Cross-compile target (e.g., "linux-x86_64"). Nil for current
     >   platform.
+    > Terminal - Terminal to print progress through (default Terminal.default())
 ]]
 function Toolkit.build(options: {
+    DisplayName: string?,
     Name: string,
     EntryPoint: string,
     OutputDir: string?,
     Target: string?,
+    Terminal: Terminal.Terminal?,
 })
     assert(buildOptionsCheck(options))
 
     const outputDir = options.OutputDir or "Build"
     const target = options.Target
+    const terminal = options.Terminal or Terminal.default()
 
-    print()
-    print("Building " .. Chalk.bold(Chalk.blueBright(options.Name)) .. " executable...")
+    terminal:Print(terminal:Heading(`Building {options.DisplayName or options.Name}...`))
 
     -- Resolve entry point
     const entryPoint = options.EntryPoint
-    if not fs.isDir(entryPoint) and not fs.isFile(entryPoint) then
-        print(Chalk.red('Entry point "' .. entryPoint .. '" not found.'))
+    const entryIsDir = fs.isDir(entryPoint)
+    if not entryIsDir and not fs.isFile(entryPoint) then
+        terminal:Print(terminal:Error(`Entry point {terminal:Path(entryPoint)} not found.`))
         process.exit(1)
     end
 
@@ -137,11 +146,9 @@ function Toolkit.build(options: {
     if target then
         table.insert(args, "--target")
         table.insert(args, target)
-        print("Target is " .. Chalk.dim(target) .. ".")
-    else
-        print("Target is " .. Chalk.dim(process.os .. "-" .. process.arch) .. ".")
     end
-    print("Entry point is " .. Chalk.dim(entryPoint) .. ".")
+    terminal:Print(`Target is {terminal:Identifier(target or SelfUpdate.getPlatformSuffix())}.`)
+    terminal:Print(`Entry point is {terminal:Path(entryPoint, { Directory = entryIsDir })}.`)
 
     const result = process.exec("lune", args)
 
@@ -157,14 +164,13 @@ function Toolkit.build(options: {
         end
 
         if fs.isFile(outputFile) then
-            print("Output file is " .. Chalk.dim(outputFile) .. ".")
+            terminal:Print(`Output file is {terminal:Path(outputFile)}.`)
         end
 
-        print()
-        print(Chalk.bold(Chalk.greenBright("Build completed successfully!")))
+        terminal:Print(terminal:Success("Build completed successfully!"))
     else
-        print(Chalk.redBright("Build failed."))
-        print(result.stderr)
+        terminal:Print(terminal:Error("Build failed."))
+        terminal:Print(result.stderr)
         process.exit(1)
     end
 end
@@ -251,7 +257,8 @@ function Toolkit.installCompletions(options: {
     end
 
     fs.writeFile(completionFile, script)
-    print("Installed " .. shell .. " completions to " .. Chalk.dim(completionFile) .. ".")
+    const terminal = Terminal.default()
+    terminal:Print(`Installed {shell} completions to {terminal:Path(completionFile)}.`)
 
     -- Configure the shell to load completions
     const marker = "# Added by commandline-luau"
@@ -267,7 +274,7 @@ function Toolkit.installCompletions(options: {
         end
 
         if string.find(content, marker, 1, true) then
-            print(Chalk.dim("Shell config already configured."))
+            terminal:Print("Shell config already configured.")
             return
         end
 
@@ -281,8 +288,8 @@ function Toolkit.installCompletions(options: {
         content = content .. marker .. "\n" .. fPathLine .. "\n" .. compInitLine .. "\n"
 
         fs.writeFile(configPath, content)
-        print("Added completions to " .. Chalk.dim(configPath) .. ".")
-        print(Chalk.yellow("Restart your terminal to enable completions."))
+        terminal:Print(`Added completions to {terminal:Path(configPath)}.`)
+        terminal:Print(terminal:Warning("Restart your terminal to enable completions."))
     elseif shell == "powershell" or shell == "pwsh" then
         -- Find or create the PowerShell profile
         const profileDir = homeDir .. "/.config/powershell"
@@ -298,7 +305,7 @@ function Toolkit.installCompletions(options: {
         end
 
         if string.find(content, marker, 1, true) then
-            print(Chalk.dim("Shell config already configured."))
+            terminal:Print("Shell config already configured.")
             return
         end
 
@@ -314,16 +321,14 @@ function Toolkit.installCompletions(options: {
         content = content .. marker .. "\n" .. sourceLine .. "\n"
 
         fs.writeFile(profilePath, content)
-        print("Added completions to " .. Chalk.dim(profilePath) .. ".")
-        print(Chalk.yellow("Restart PowerShell to enable completions."))
+        terminal:Print(`Added completions to {terminal:Path(profilePath)}.`)
+        terminal:Print(terminal:Warning("Restart PowerShell to enable completions."))
     end
 end
 
 ------------------------------------------------------------------------------------------
 -- Install and Update (Direct Binary Replacement)
 ------------------------------------------------------------------------------------------
-
-const SelfUpdate = require("@self/SelfUpdate")
 
 const installOptionsCheck = t.interface({
     Name = t.string,
@@ -380,7 +385,9 @@ function Toolkit.installCommand(options: {
     }
     const XSH_PATH_FILE = HOME_DIR .. "/.path"
 
-    const function downloadLatestBinary(): string?
+    const function downloadLatestBinary(terminal: Terminal.Terminal): string?
+        assert(t.table(terminal))
+
         const url = `https://api.github.com/repos/{repository}/releases/latest`
         const ok, response = pcall(net.request, {
             url = url,
@@ -389,13 +396,13 @@ function Toolkit.installCommand(options: {
         })
 
         if not ok or not response.ok then
-            print(Chalk.red("Failed to fetch latest release."))
+            terminal:Print(terminal:Error("Failed to fetch latest release."))
             return nil
         end
 
         const success, release = pcall(serde.decode, "json" :: "json", response.body)
         if not success then
-            print(Chalk.red("Failed to parse release data."))
+            terminal:Print(terminal:Error("Failed to parse release data."))
             return nil
         end
 
@@ -404,7 +411,7 @@ function Toolkit.installCommand(options: {
         const downloadUrl = SelfUpdate.getAssetDownloadUrl(name, release.assets or {}, platformSuffix)
 
         if not downloadUrl then
-            print(Chalk.red(`Asset "{assetName}" not found in latest release.`))
+            terminal:Print(terminal:Error(`Asset "{terminal:Identifier(assetName)}" not found in latest release.`))
             return nil
         end
 
@@ -415,14 +422,16 @@ function Toolkit.installCommand(options: {
         })
 
         if not dlOk or not dlResponse.ok then
-            print(Chalk.red("Failed to download binary."))
+            terminal:Print(terminal:Error("Failed to download binary."))
             return nil
         end
 
         return dlResponse.body
     end
 
-    const function addToPath()
+    const function addToPath(terminal: Terminal.Terminal)
+        assert(t.table(terminal))
+
         if IS_WINDOWS then
             const psCmd = "$p = [Environment]::GetEnvironmentVariable('PATH','User');"
                 .. " if ($p -notlike '*"
@@ -432,7 +441,7 @@ function Toolkit.installCommand(options: {
                 .. ";' + $p, 'User') }"
             const result = process.exec("powershell", { "-Command", psCmd })
             if result.ok then
-                print(`Added {Chalk.dim(BIN_DIR)} to user PATH.`)
+                terminal:Print(`Added {terminal:Path(BIN_DIR, { Directory = true })} to user PATH.`)
             end
             return
         end
@@ -446,7 +455,9 @@ function Toolkit.installCommand(options: {
                 end
                 content ..= BIN_DIR .. "\n"
                 fs.writeFile(XSH_PATH_FILE, content)
-                print(`Added {Chalk.dim(BIN_DIR)} to {Chalk.dim("~/.path")}.`)
+                terminal:Print(
+                    `Added {terminal:Path(BIN_DIR, { Directory = true })} to {terminal:Path(XSH_PATH_FILE)}.`
+                )
             end
             return
         end
@@ -462,7 +473,7 @@ function Toolkit.installCommand(options: {
                     end
                     content ..= "\n" .. PATH_EXPORT_COMMENT .. "\n" .. PATH_EXPORT_LINE .. "\n"
                     fs.writeFile(configPath, content)
-                    print(`Added {Chalk.dim(name)} to {Chalk.dim("~/" .. config.file)}.`)
+                    terminal:Print(`Added {terminal:Identifier(name)} to {terminal:Path(configPath)}.`)
                 end
             end
         end
@@ -472,8 +483,9 @@ function Toolkit.installCommand(options: {
         Name = "install",
         Description = `Install {name} CLI to ~/{installDir} and add to PATH.`,
         Impl = function()
-            print(`Installing {Chalk.bold(Chalk.blueBright(name))} {Chalk.dim(version)}...`)
-            print()
+            const terminal = Terminal.default()
+            terminal:Print(terminal:Heading(`Installing {name} {terminal:Identifier(version)}...`))
+            terminal:Print()
 
             -- Create directory structure
             if not fs.isDir(INSTALL_PATH) then
@@ -494,13 +506,13 @@ function Toolkit.installCommand(options: {
                     sourcePath = currentExe,
                     targetPath = binaryPath,
                 })
-                print(`Copied executable to {Chalk.dim(binaryPath)}.`)
+                terminal:Print(`Copied executable to {terminal:Path(binaryPath)}.`)
             else
                 -- Download from GitHub releases
-                print("Downloading binary...")
-                const contents = downloadLatestBinary()
+                terminal:Print("Downloading binary...")
+                const contents = downloadLatestBinary(terminal)
                 if not contents then
-                    print(Chalk.red("Failed to install. Could not download binary."))
+                    terminal:Print(terminal:Error("Failed to install. Could not download binary."))
                     process.exit(1)
                     return
                 end
@@ -508,15 +520,15 @@ function Toolkit.installCommand(options: {
                     targetPath = binaryPath,
                     newContents = contents,
                 })
-                print("Downloaded successfully.")
+                terminal:Print(terminal:Success("Downloaded successfully."))
             end
 
             -- Add to PATH
-            addToPath()
+            addToPath(terminal)
 
-            print()
-            print(Chalk.bold(Chalk.greenBright("Installation complete!")))
-            print(Chalk.yellow("Restart your terminal for PATH changes to take effect."))
+            terminal:Print()
+            terminal:Print(terminal:Success("Installation complete!"))
+            terminal:Print(terminal:Warning("Restart your terminal for PATH changes to take effect."))
         end,
     })
 end
@@ -594,6 +606,7 @@ function Toolkit.updateCommand(options: {
             }),
         },
         Impl = function(args)
+            const terminal = Terminal.default()
             const targetVersion = args.version
 
             -- Clean up leftover .old file from previous Windows update
@@ -602,14 +615,14 @@ function Toolkit.updateCommand(options: {
                 SelfUpdate.cleanupOldBinary(currentExe)
             end
 
-            print(`Checking for updates to {Chalk.bold(Chalk.blueBright(name))}...`)
+            terminal:Print(terminal:Heading(`Checking for updates to {name}...`))
 
             const release = getRelease(targetVersion)
             if not release then
-                print(
-                    Chalk.red(
+                terminal:Print(
+                    terminal:Error(
                         if targetVersion
-                            then `Version "{targetVersion}" not found.`
+                            then `Version "{terminal:Identifier(targetVersion)}" not found.`
                             else "Failed to fetch latest release."
                     )
                 )
@@ -618,18 +631,26 @@ function Toolkit.updateCommand(options: {
 
             const newVersion = release.version
             if newVersion == currentVersion and not targetVersion then
-                print(`Already on the latest version ({Chalk.bold(Chalk.blueBright(currentVersion))}).`)
+                terminal:Print(`Already on the latest version ({terminal:Identifier(currentVersion)}).`)
                 return
             end
 
-            print(`Updating from {Chalk.dim(currentVersion)} to {Chalk.bold(Chalk.blueBright(newVersion))}...`)
+            terminal:Print(
+                `Updating from {terminal:Identifier(currentVersion)} to {terminal:Identifier(newVersion)}...`
+            )
 
             -- Find download URL for current platform
             const platformSuffix = SelfUpdate.getPlatformSuffix()
             const downloadUrl = SelfUpdate.getAssetDownloadUrl(name, release.assets, platformSuffix)
 
             if not downloadUrl then
-                print(Chalk.red(`Binary for {platformSuffix} not found in release {newVersion}.`))
+                terminal:Print(
+                    terminal:Error(
+                        `Binary for {terminal:Identifier(platformSuffix)} not found in release {terminal:Identifier(
+                            newVersion
+                        )}.`
+                    )
+                )
                 process.exit(1)
             end
 
@@ -641,7 +662,7 @@ function Toolkit.updateCommand(options: {
             })
 
             if not dlOk or not dlResponse.ok then
-                print(Chalk.red("Failed to download update."))
+                terminal:Print(terminal:Error("Failed to download update."))
                 process.exit(1)
             end
 
@@ -652,12 +673,16 @@ function Toolkit.updateCommand(options: {
                     newContents = dlResponse.body,
                 })
             else
-                print(Chalk.red(`Could not find {name} on PATH. Run "{name} install" first.`))
+                terminal:Print(
+                    terminal:Error(
+                        `Could not find {terminal:Identifier(name)} on PATH. Run "{terminal:Identifier(`{name} install`)}" first.`
+                    )
+                )
                 process.exit(1)
             end
 
-            print()
-            print(Chalk.bold(Chalk.greenBright(`Updated to {newVersion}!`)))
+            terminal:Print()
+            terminal:Print(terminal:Success(`Updated to {terminal:Identifier(newVersion)}!`))
         end,
     })
 end
