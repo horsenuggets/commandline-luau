@@ -52,6 +52,7 @@ export type PathOptions = {
 }
 
 export type PrintOptions = {
+    Timestamps: boolean?,
     Wrap: boolean?,
 }
 
@@ -343,7 +344,10 @@ const function writeLines(
     options: PrintOptions?
 ): string
     assert(t.optional(t.string)(text))
-    assert(t.optional(t.strictInterface({ Wrap = t.optional(t.boolean) }))(options))
+    assert(t.optional(t.strictInterface({
+        Timestamps = t.optional(t.boolean),
+        Wrap = t.optional(t.boolean),
+    }))(options))
 
     local activeStyle = previousStyle or ""
     const columns = if options and options.Wrap == false then 0 else self:Columns()
@@ -355,7 +359,7 @@ const function writeLines(
             table.insert(lines, "\n")
             continue
         end
-        const prefix = self:Prefix()
+        const prefix = if options and options.Timestamps == false then "" else self:Prefix()
         const styledPrefix = if prefix ~= "" and self.Color then `\u{1b}[0m{prefix}{activeStyle}` else prefix
         const full = `{styledPrefix}{trimmed}`
         activeStyle = Style.sgrState(activeStyle, trimmed)
@@ -366,12 +370,13 @@ const function writeLines(
     return activeStyle
 end
 
--- Writes timestamped text to standard output. Pass Wrap = false for preformatted text.
+-- Writes text to standard output. Pass Timestamps = false to suppress the configured
+-- prefix for this write, and Wrap = false for preformatted text.
 function Terminal.Print(self: Terminal, text: string?, options: PrintOptions?)
     writeLines(self, "Output", text, nil, options)
 end
 
--- Writes timestamped text to standard error. Pass Wrap = false for preformatted text.
+-- Writes text to standard error with the same per-write options as Print.
 function Terminal.PrintError(self: Terminal, text: string?, options: PrintOptions?)
     writeLines(self, "Error", text, nil, options)
 end
