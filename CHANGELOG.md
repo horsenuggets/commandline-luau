@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.8
+
+- Applied configured terminal timestamps to command help, diagnostics, and version output.
+- Kept help and versions on standard output and sent command diagnostics to standard error.
+- Added per-print wrapping control to preserve preformatted help without changing prose.
+- Refined root and nested help headings, secondary text, and unlabelled error spacing.
+
 ## 0.2.7
 
 - Added semantic terminal themes with configurable colors, attributes, and foreground opacity.
