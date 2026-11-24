@@ -256,6 +256,49 @@ return function()
             )
         end)
 
+        it("should opt out of wrapping per print without changing later output or streams", function()
+            for _, color in { false, true } do
+                for _, timestamps in { false, true } do
+                    const h = harness({
+                        Color = color,
+                        Columns = 18,
+                        Timestamps = if timestamps then "stopwatch" else nil,
+                    })
+                    const text = h.Terminal:Warning("One two three four five.\n\nSix seven eight nine.")
+                    h.Terminal:Print(text, { Wrap = false })
+                    h.Terminal:PrintError(text, { Wrap = false })
+                    const prefix = if timestamps then "[00:00.000] " else ""
+                    const expected = `{prefix}One two three four five.\n\n{prefix}Six seven eight nine.\n`
+                    expect(Style.strip(table.concat(h.Output))).to.equal(expected)
+                    expect(table.concat(h.Errors)).to.equal(table.concat(h.Output))
+                    expect(h.Terminal:Columns()).to.equal(18)
+
+                    table.clear(h.Output)
+                    h.Terminal:Print("One two three four five.", { Wrap = true })
+                    const wrapped = table.concat(h.Output)
+                    expect(wrapped == `{prefix}One two three four five.\n`).to.equal(false)
+                    table.clear(h.Output)
+                    h.Terminal:Print("One two three four five.")
+                    expect(table.concat(h.Output)).to.equal(wrapped)
+                    table.clear(h.Output)
+                    const stream = h.Terminal:Stream()
+                    stream.Write("One two three four five.\n")
+                    stream.Flush()
+                    expect(table.concat(h.Output)).to.equal(wrapped)
+                end
+            end
+        end)
+
+        it("should reject invalid print options", function()
+            const terminal = harness().Terminal
+            expect(function()
+                terminal:Print("Text.", { Wrap = "no" } :: any)
+            end).to.throw()
+            expect(function()
+                terminal:PrintError("Text.", { Unknown = true } :: any)
+            end).to.throw()
+        end)
+
         it("should wrap explicit-alpha timestamps using only their visible width", function()
             for _, color in { true, false } do
                 const h = harness({

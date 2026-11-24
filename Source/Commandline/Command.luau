@@ -14,6 +14,7 @@ const Chalk = require("@packages/Chalk")
 const Flag = require("./Flag")
 const StringUtils = require("./Helpers/StringUtils")
 const Style = require("./Terminal/Style")
+const Terminal = require("./Terminal")
 const TypeUtils = require("./Helpers/TypeUtils")
 const t = require("@packages/t")
 
@@ -326,11 +327,11 @@ function Command._setCommandPath(self: Command, path: string)
 end
 
 function Command.ShowHelp(self: Command)
-    print(self._helpMessage)
+    Terminal.default():Print(self._helpMessage, { Wrap = false })
 end
 
 function Command._printError(self: Command, message: string)
-    print(`{Chalk.red(message)}\n`)
+    Terminal.default():PrintError(`{Chalk.red(message)}\n`)
 end
 
 function Command._findFlagByName(self: Command, name: string): Flag.Flag?
@@ -531,7 +532,7 @@ function Command.Execute(self: Command, tokens: { string }): any
 
     -- Check for version Flag
     if parsedFlags.version and parsedFlags.version.Value then
-        print(self.Version)
+        Terminal.default():Print(self.Version)
         return
     end
 
