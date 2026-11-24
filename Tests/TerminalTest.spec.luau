@@ -279,6 +279,47 @@ return function()
         end)
     end)
 
+    describe("Terminal prompts", function()
+        it("should pass each prompt kind, its default, and the current RGB theme to the native boundary", function()
+            const cases: { [string]: { Default: Terminal.PromptDefault?, Result: Terminal.PromptResult } } = {
+                confirm = { Default = true, Result = false },
+                multiselect = { Default = { "First", "Second" }, Result = { 1, 2 } },
+                password = { Result = "secret" },
+                select = { Default = { "First", "Second" }, Result = 2 },
+                text = { Default = "initial", Result = "answer" },
+            }
+            for _, color in { false, true } do
+                const terminal = harness({
+                    Color = color,
+                    Prompt = function(kind, text, defaultValue, colors)
+                        const case = cases[kind]
+                        expect(text).to.equal("Question?")
+                        expect(defaultValue).to.equal(case.Default)
+                        expect(colors.Accent).to.equal("#010203")
+                        expect(colors.Color).to.equal(color)
+                        expect(colors.Error).to.equal("#040506")
+                        expect(colors.Muted).to.equal("#070809")
+                        expect(colors.Success).to.equal("#0A0B0C")
+                        expect(colors.Text).to.equal("#0D0E0F")
+                        expect(colors.Warning).to.equal("#101112")
+                        return case.Result
+                    end,
+                    Theme = {
+                        Error = { Color = "#040506" },
+                        HelpArgument = { Color = "#0D0E0F" },
+                        Muted = { Color = "#070809" },
+                        RobloxPath = { Color = "#010203" },
+                        Success = { Color = "#0A0B0C" },
+                        Warning = { Color = "#101112" },
+                    },
+                }).Terminal
+                for kind, case in cases do
+                    expect(terminal:Prompt(kind, "Question?", case.Default)).to.equal(case.Result)
+                end
+            end
+        end)
+    end)
+
     describe("Terminal helpers", function()
         it("should style paths by kind and normalize them", function()
             const terminal = harness({ Color = false, Home = "C:\\Users\\user" }).Terminal
