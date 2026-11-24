@@ -8,7 +8,6 @@ subcommands, and help generation.
 --]]
 
 const Arg = require("../Source/Commandline/Arg")
-const Chalk = require("@packages/Chalk")
 const Command = require("../Source/Commandline/Command")
 const Flag = require("../Source/Commandline/Flag")
 const Style = require("../Source/Commandline/Terminal/Style")
@@ -616,6 +615,78 @@ return function()
     end)
 
     describe("Command output", function()
+        it("should render help against the current RGB theme after command construction", function()
+            const theme = {
+                Emphasis = { Bold = true, Color = "#112233" },
+                HelpArgument = { Color = "#223344" },
+                HelpCommand = { Color = "#334455" },
+                HelpDescription = { Color = "#445566", Italic = true },
+                HelpHeading = { Color = "#556677" },
+                HelpVersion = { Color = "#667788" },
+                Muted = { Color = "#778899" },
+            }
+            const output, _, errors = executeWithOutput(function(command)
+                return command.new({
+                    Name = "app",
+                    Description = "Manage places.",
+                    Version = "1.2.3",
+                    Subcommands = { command.new({ Name = "open", Description = "Open a place." }) },
+                })
+            end, { "--help" }, { Color = true, Theme = theme })
+            for key, text in
+                {
+                    Emphasis = "app",
+                    HelpArgument = "subcommand",
+                    HelpCommand = "open",
+                    HelpDescription = "Manage places.",
+                    HelpHeading = "Usage",
+                    HelpVersion = "1.2.3",
+                    Muted = "> ",
+                }
+            do
+                expect(string.find(output, Style.paint((theme :: any)[key], text, true), 1, true) ~= nil).to.equal(true)
+            end
+            expect(errors).to.equal("")
+        end)
+
+        it("should honor disabled color and NO_COLOR throughout help and diagnostics", function()
+            for _, config in
+                {
+                    { Color = false },
+                    { Env = { NO_COLOR = "1" } },
+                }
+            do
+                for _, tokens in { { "--help" }, { "--unknown" }, { "unknown" } } do
+                    const output = executeWithOutput(function(command)
+                        return command.new({
+                            Name = "app",
+                            Description = "Manage places.",
+                            Version = "1.2.3",
+                            Subcommands = { command.new({ Name = "open", Description = "Open a place." }) },
+                        })
+                    end, tokens, config)
+                    expect(output).to.equal(Style.strip(output))
+                end
+            end
+        end)
+
+        it("should use RGB colors for every built-in help color and diagnostic", function()
+            const output, help, errors = executeWithOutput(function(command)
+                return command.new({ Name = "app", Description = "Manage places.", Version = "1.2.3" })
+            end, { "--unknown" }, { Color = true })
+            for _, code in
+                { "38;2;122;162;247", "38;2;192;202;245", "38;2;224;175;104", "38;2;158;206;106", "38;2;168;168;168" }
+            do
+                expect(string.find(help, code, 1, true) ~= nil).to.equal(true)
+            end
+            expect(string.find(errors, "38;2;247;118;142", 1, true) ~= nil).to.equal(true)
+            for _, code in
+                { "2", "30", "31", "32", "33", "34", "35", "36", "37", "90", "91", "92", "93", "94", "95", "96", "97" }
+            do
+                expect(string.find(output, `\u{1b}[{code}m`, 1, true)).to.equal(nil)
+            end
+        end)
+
         it("should leave root and nested help untimestamped without wrapping or changing its layout", function()
             for _, timestamps in { false, true } do
                 for _, nested in { false, true } do
@@ -647,20 +718,7 @@ return function()
                     expect(Style.strip(output)).to.equal(expected)
                     expect(stdout).to.equal(output)
                     expect(stderr).to.equal("")
-                    expect(
-                        string.find(
-                            output,
-                            Chalk.italic(
-                                Chalk.hex(Style.DefaultTheme.Muted.Color :: string)(
-                                    if nested
-                                        then "Open a place without wrapping this long description."
-                                        else "Manage places without wrapping this long description."
-                                )
-                            ),
-                            1,
-                            true
-                        )
-                    ).to.be.ok()
+                    expect(output).to.equal(expected)
                 end
             end
         end)
@@ -759,7 +817,7 @@ return function()
             expect(Style.strip(stdout):sub(1, 4)).to.equal("app\n")
             expect(string.find(stdout, "[00:00.000]", 1, true)).to.equal(nil)
             expect(output).to.equal(`{stderr}{stdout}`)
-            expect(string.find(stderr, Chalk.red(`Unknown flag {Chalk.bold("--unknown")}.`), 1, true)).to.be.ok()
+            expect(stderr).to.equal("[00:00.000] Unknown flag --unknown.\n\n")
         end)
 
         it("should print unlabelled red errors followed by one blank line before help", function()
@@ -803,7 +861,7 @@ return function()
                 expect(lines[1]).to.equal(case.Message)
                 expect(lines[2]).to.equal("")
                 expect(lines[3]).to.equal(if case.Tokens[1] == "open" then "Open a place." else "app")
-                expect(string.sub(output, 1, 5)).to.equal("\u{1b}[31m")
+                expect(string.sub(output, 1, #"\u{1b}[38;2;247;118;142m")).to.equal("\u{1b}[38;2;247;118;142m")
                 expect(string.find(output, "[Error]", 1, true)).to.equal(nil)
             end
         end)
@@ -827,12 +885,14 @@ return function()
                     Description = "Manage places.",
                     Version = if version == "" then nil else version,
                 })
-                const lines = string.split(Style.strip(cmd._helpMessage), "\n")
+                const lines = string.split(Style.strip(cmd:_makeHelpMessage()), "\n")
                 expect(lines[1]).to.equal(if version == "" then "app" else "app [1.2.3]")
                 expect(lines[2]).to.equal("Manage places.")
                 expect(lines[3]).to.equal("")
                 expect(lines[4]).to.equal("[Usage]")
-                expect(string.find(cmd._helpMessage, Chalk.bold("app"), 1, true)).to.equal(1)
+                expect(string.find(cmd:_makeHelpMessage(), Terminal.default():Paint("Emphasis", "app"), 1, true)).to.equal(
+                    1
+                )
             end
         end)
 
@@ -843,10 +903,10 @@ return function()
                 Version = "1.2.3",
                 Subcommands = { Command.new({ Name = "open", Description = "Open a place." }) },
             })
-            const muted = Chalk.hex(Style.DefaultTheme.Muted.Color :: string)
-            expect(string.find(cmd._helpMessage, Chalk.italic(muted(cmd.Description)), 1, true)).to.be.ok()
-            expect(string.find(cmd._helpMessage, Chalk.italic(muted("Open a place.")), 1, true)).to.be.ok()
-            expect(string.find(cmd._helpMessage, "\u{1b}[90m", 1, true)).to.equal(nil)
+            const terminal = Terminal.default()
+            expect(string.find(cmd:_makeHelpMessage(), terminal:Paint("HelpDescription", cmd.Description), 1, true)).to.be.ok()
+            expect(string.find(cmd:_makeHelpMessage(), terminal:Paint("HelpDescription", "Open a place."), 1, true)).to.be.ok()
+            expect(string.find(cmd:_makeHelpMessage(), "\u{1b}[90m", 1, true)).to.equal(nil)
         end)
 
         it("should generate help message", function()
@@ -888,12 +948,19 @@ return function()
             expect(middle._commandPath).to.equal("app api-key")
             expect(leaf._commandPath).to.equal("app api-key list")
             for _, command in { middle, leaf } do
-                const lines = string.split(Style.strip(command._helpMessage), "\n")
+                const lines = string.split(Style.strip(command:_makeHelpMessage()), "\n")
                 expect(lines[1]).to.equal(command.Description)
                 expect(lines[2]).to.equal("")
                 expect(lines[3]).to.equal("[Usage]")
                 expect(string.find(lines[4], command._commandPath, 1, true)).to.be.ok()
-                expect(string.find(command._helpMessage, Chalk.bold(command._commandPath), 1, true)).to.equal(nil)
+                expect(
+                    string.find(
+                        command:_makeHelpMessage(),
+                        Terminal.default():Paint("Emphasis", command._commandPath),
+                        1,
+                        true
+                    )
+                ).to.equal(nil)
             end
         end)
 
@@ -907,7 +974,7 @@ return function()
                 Name = "myapp",
                 Subcommands = { sub },
             })
-            expect(string.find(sub._helpMessage, "myapp deploy", 1, true)).to.be.ok()
+            expect(string.find(sub:_makeHelpMessage(), "myapp deploy", 1, true)).to.be.ok()
         end)
     end)
 end

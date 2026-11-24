@@ -8,7 +8,6 @@ enabling shell completions.
 
 --]]
 
-const Chalk = require("@packages/Chalk")
 const fs = require("@lune/fs")
 const process = require("@lune/process")
 const t = require("@packages/t")
@@ -53,9 +52,10 @@ function Toolkit.generateVersion(options: {
     assert(generateVersionCheck(options))
 
     const versionFile = options.VersionFile or "VERSION"
+    const terminal = Terminal.default()
 
     if not fs.isFile(versionFile) then
-        print(Chalk.red('VERSION file not found at "' .. versionFile .. '".'))
+        terminal:PrintError(terminal:Error(`VERSION file not found at "{versionFile}".`))
         process.exit(1)
     end
 
@@ -72,7 +72,7 @@ function Toolkit.generateVersion(options: {
 
     fs.writeFile(options.OutputPath, versionModule)
 
-    print("Generated version module with version " .. Chalk.bold(Chalk.blueBright(version)) .. ".")
+    terminal:Print(`Generated version module with version {terminal:Heading(version)}.`)
 end
 
 --[[
