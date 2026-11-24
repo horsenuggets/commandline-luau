@@ -166,7 +166,7 @@ return function()
                 TimestampFaint = "#A8A8A8",
                 TimestampText = "#A8A8A8",
                 Url = "#A8A8A8",
-                Warning = "#E0AF68",
+                Warning = "#E0AF68"
             }
             for key, spec in Style.DefaultTheme :: any do
                 expect(spec.Color).to.equal((palette :: any)[key])

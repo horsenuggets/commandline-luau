@@ -29,7 +29,7 @@ const WINDOWS_COLUMNS_SCRIPT =
 const TIMESTAMPS_VARIABLE = "COMMANDLINE_TIMESTAMPS"
 
 export type Capabilities = {
-    ForegroundOpacity: boolean,
+    ForegroundOpacity: boolean
 }
 
 export type Clock = {
@@ -45,7 +45,7 @@ export type PromptColors = {
     Muted: string,
     Success: string,
     Text: string,
-    Warning: string,
+    Warning: string
 }
 
 export type PromptDefault = boolean | string | { string }
@@ -339,7 +339,7 @@ function Terminal.Prompt(self: Terminal, kind: string, text: string?, defaultVal
         Muted = self.Theme.Muted.Color or "",
         Success = self.Theme.Success.Color or "",
         Text = self.Theme.HelpArgument.Color or "",
-        Warning = self.Theme.Warning.Color or "",
+        Warning = self.Theme.Warning.Color or ""
     })
 end
 

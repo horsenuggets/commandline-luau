@@ -217,7 +217,7 @@ return function()
                 for _, noColor in { false, true } do
                     Terminal.setDefault(Terminal.new({
                         Env = if noColor then { NO_COLOR = "1" } else {},
-                        Theme = { HelpCommand = { Color = "#112233" } },
+                        Theme = { HelpCommand = { Color = "#112233" } }
                     }))
                     const output = Completions.zsh(command)
                     expect(string.find(output, "\\e[38;2;17;34;51", 1, true) ~= nil).to.equal(not noColor)

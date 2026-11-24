@@ -233,7 +233,7 @@ return function()
                         end,
                         WriteError = function(text)
                             table.insert(errors, text)
-                        end,
+                        end
                     })
                     const exited = {}
                     const dependencies: { [string]: any } = {
@@ -247,13 +247,13 @@ return function()
                             readFile = function()
                                 return "1.2.3\n"
                             end,
-                            writeFile = function() end,
+                            writeFile = function() end
                         },
                         ["@lune/process"] = {
                             exit = function(code)
                                 expect(code).to.equal(1)
                                 error(exited, 0)
-                            end,
+                            end
                         },
                         ["@packages/t"] = t,
                         ["@self/Completions"] = {},
@@ -261,8 +261,8 @@ return function()
                         ["@self/Terminal"] = {
                             default = function()
                                 return terminal
-                            end,
-                        },
+                            end
+                        }
                     }
                     const toolkit = luau.load(TOOLKIT_SOURCE, {
                         environment = {
@@ -271,8 +271,8 @@ return function()
                             end,
                             require = function(path)
                                 return assert(dependencies[path], `Unexpected dependency "{path}".`)
-                            end,
-                        },
+                            end
+                        }
                     })()
                     const ok, problem =
                         pcall(toolkit.generateVersion, { VersionFile = "VERSION", OutputPath = "out.luau" })

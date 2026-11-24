@@ -623,14 +623,14 @@ return function()
                 HelpDescription = { Color = "#445566", Italic = true },
                 HelpHeading = { Color = "#556677" },
                 HelpVersion = { Color = "#667788" },
-                Muted = { Color = "#778899" },
+                Muted = { Color = "#778899" }
             }
             const output, _, errors = executeWithOutput(function(command)
                 return command.new({
                     Name = "app",
                     Description = "Manage places.",
                     Version = "1.2.3",
-                    Subcommands = { command.new({ Name = "open", Description = "Open a place." }) },
+                    Subcommands = { command.new({ Name = "open", Description = "Open a place." }) }
                 })
             end, { "--help" }, { Color = true, Theme = theme })
             for key, text in
@@ -641,7 +641,7 @@ return function()
                     HelpDescription = "Manage places.",
                     HelpHeading = "Usage",
                     HelpVersion = "1.2.3",
-                    Muted = "> ",
+                    Muted = "> "
                 }
             do
                 expect(string.find(output, Style.paint((theme :: any)[key], text, true), 1, true) ~= nil).to.equal(true)
@@ -653,7 +653,7 @@ return function()
             for _, config in
                 {
                     { Color = false },
-                    { Env = { NO_COLOR = "1" } },
+                    { Env = { NO_COLOR = "1" } }
                 }
             do
                 for _, tokens in { { "--help" }, { "--unknown" }, { "unknown" } } do
@@ -662,7 +662,7 @@ return function()
                             Name = "app",
                             Description = "Manage places.",
                             Version = "1.2.3",
-                            Subcommands = { command.new({ Name = "open", Description = "Open a place." }) },
+                            Subcommands = { command.new({ Name = "open", Description = "Open a place." }) }
                         })
                     end, tokens, config)
                     expect(output).to.equal(Style.strip(output))
