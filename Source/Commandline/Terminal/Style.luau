@@ -40,6 +40,20 @@ const NAMED_COLORS = {
     yellowBright = 93,
 }
 const PATH_SEPARATOR_DOT = "·"
+const SGR_RESETS = {
+    [22] = 1,
+    [23] = 3,
+    [24] = 4,
+    [25] = 5,
+    [27] = 7,
+    [28] = 8,
+    [29] = 9,
+    [39] = 30,
+    [49] = 40,
+    [54] = 51,
+    [55] = 53,
+    [59] = 58,
+}
 
 export type Spec = {
     Bold: boolean?,
@@ -229,11 +243,28 @@ function Style.paint(spec: Spec, text: string, color: boolean): string
     -- Text painted inside this text ends with its own closing codes, which would also end
     -- this spec's color or weight. Reopening this spec after each one keeps it going.
     const nested = {}
-    for _, token in Text.tokens(text) do
+    const tokens = Text.tokens(text)
+    for index, token in tokens do
         table.insert(nested, token.Text)
         const parameters = if token.Escape then string.match(token.Text, "^\u{1b}%[([%d;:]*)m$") else nil
-        if parameters and Style.isClosing(parameters) then
+        const nextToken = tokens[index + 1]
+        const dot = nextToken
+            and nextToken.Text == PATH_SEPARATOR_DOT
+            and parameters
+            and (parameters == "22" or string.sub(parameters, 1, 3) == "22;")
+        if parameters and Style.isClosing(parameters) and not dot then
             table.insert(nested, opening)
+        end
+        if token.Text == PATH_SEPARATOR_DOT and index > 1 then
+            const previous = tokens[index - 1]
+            if previous.Escape and string.match(previous.Text, "^\u{1b}%[22[;m]") then
+                if spec.Bold then
+                    table.insert(nested, `{ESCAPE}1m`)
+                end
+                if spec.Dim then
+                    table.insert(nested, `{ESCAPE}2m`)
+                end
+            end
         end
     end
     return `{opening}{table.concat(nested)}{closing}`
@@ -262,8 +293,8 @@ function Style.paintPath(spec: Spec, text: string, color: boolean): string
     assert(t.string(text))
     assert(t.boolean(color))
 
-    if not color or not spec.Bold then
-        return Style.paint(spec, (string.gsub(text, " ", PATH_SEPARATOR_DOT)), color)
+    if not color then
+        return (string.gsub(text, " ", PATH_SEPARATOR_DOT))
     end
     -- Built directly rather than through paint, which would reopen bold after the dot.
     -- The unbold code restates the color, so text painted around the path never mistakes
@@ -276,8 +307,62 @@ function Style.paintPath(spec: Spec, text: string, color: boolean): string
     if spec.Color then
         table.insert(unbold, Style.colorCode(spec.Color, spec.Opacity) :: string)
     end
-    const separated = string.gsub(text, " ", `{ESCAPE}{table.concat(unbold, ";")}m{PATH_SEPARATOR_DOT}{ESCAPE}1m`)
+    const restore = if spec.Bold then `{ESCAPE}1m` else ""
+    const separated = string.gsub(text, " ", `{ESCAPE}{table.concat(unbold, ";")}m{PATH_SEPARATOR_DOT}{restore}`)
     return `{opening}{separated}{closing}`
+end
+
+-- Returns only the active SGR settings, so replay stays bounded across streamed lines.
+function Style.sgrState(previous: string, text: string): string
+    assert(t.string(previous))
+    assert(t.string(text))
+    const active: { [number]: string } = {}
+    for _, token in Text.tokens(`{previous}{text}`) do
+        const parameters = if token.Escape then string.match(token.Text, "^\u{1b}%[([%d;:]*)m$") else nil
+        if parameters == nil then
+            continue
+        end
+        const parts = string.split(if parameters == "" then "0" else parameters, ";")
+        local index = 1
+        while index <= #parts do
+            const parameter = parts[index]
+            const code = tonumber(string.match(parameter, "^%d+")) or 0
+            local value = parameter
+            if (code == 38 or code == 48 or code == 58) and not string.find(parameter, ":", 1, true) then
+                const count = if parts[index + 1] == "2" then 4 elseif parts[index + 1] == "5" then 2 else 0
+                value = table.concat(parts, ";", index, math.min(index + count, #parts))
+                index += count
+            end
+            if code == 0 then
+                table.clear(active)
+            elseif SGR_RESETS[code] then
+                active[SGR_RESETS[code]] = nil
+                if code == 22 then
+                    active[2] = nil
+                end
+            else
+                const key = if (code >= 30 and code <= 38) or (code >= 90 and code <= 97)
+                    then 30
+                    elseif (code >= 40 and code <= 48) or (code >= 100 and code <= 107) then 40
+                    elseif code == 6 then 5
+                    elseif code == 21 then 4
+                    elseif code == 52 then 51
+                    else code
+                active[key] = `{ESCAPE}{value}m`
+            end
+            index += 1
+        end
+    end
+    const keys = {}
+    for key in active do
+        table.insert(keys, key)
+    end
+    table.sort(keys)
+    const result = {}
+    for _, key in keys do
+        table.insert(result, active[key])
+    end
+    return table.concat(result)
 end
 
 -- Removes ANSI escape sequences, which is useful for measuring or comparing output.

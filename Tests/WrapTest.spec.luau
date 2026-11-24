@@ -128,6 +128,21 @@ return function()
             end
         end)
 
+        it("should fit trailing and whitespace-only spaces while retaining escapes", function()
+            const escape = `{ESCAPE}39m`
+            expect(Wrap.line("ab  ", 3)).to.equal("ab ")
+            expect(Wrap.line(`ab {escape} `, 3)).to.equal(`ab {escape}`)
+            expect(Wrap.line("     ", 3)).to.equal("   ")
+            expect(Wrap.line(`  {escape}   `, 3)).to.equal(`  {escape} `)
+            for columns = 1, 6 do
+                for _, text in { "ab       ", "        ", "        text" } do
+                    for _, line in string.split(Wrap.line(text, columns), "\n") do
+                        expect(Wrap.width(line) <= columns).to.equal(true)
+                    end
+                end
+            end
+        end)
+
         it("should leave text alone when the indent leaves no room", function()
             expect(Wrap.line("Some long text here.", 4, "    ")).to.equal("Some long text here.")
         end)

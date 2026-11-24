@@ -67,8 +67,12 @@ function Wrap.line(text: string, columns: number, indent: string?): string
             end
             breakLine()
         else
-            current ..= spaces
-            currentWidth += spacesWidth
+            for _, token in Text.tokens(spaces) do
+                if token.Escape or currentWidth + token.Width <= columns then
+                    current ..= token.Text
+                    currentWidth += token.Width
+                end
+            end
         end
         spaces = ""
         spacesWidth = 0
@@ -99,7 +103,12 @@ function Wrap.line(text: string, columns: number, indent: string?): string
         end
     end
     placeWord()
-    current ..= spaces
+    for _, token in Text.tokens(spaces) do
+        if token.Escape or currentWidth + token.Width <= columns then
+            current ..= token.Text
+            currentWidth += token.Width
+        end
+    end
     table.insert(lines, current)
     return table.concat(lines, "\n")
 end

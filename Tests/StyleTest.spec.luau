@@ -266,9 +266,36 @@ return function()
             expect(Style.paintPath({ Color = "#a8a8a8", Opacity = 0.25 }, "a b", false)).to.equal("a·b")
         end)
 
+        it("should suppress inherited bold for colored and colorless path dots", function()
+            for _, pathStyle in { {}, { Bold = true }, { Color = "cyanBright" }, { Bold = true, Color = "cyanBright" } } do
+                const path = Style.paintPath(pathStyle, "a b", true)
+                const painted = Style.paint({ Bold = true, Color = "blueBright" }, path, true)
+                const dot = assert(string.find(painted, "·", 1, true))
+                const before = Style.sgrState("", string.sub(painted, 1, dot - 1))
+                expect(string.find(before, `{ESCAPE}1m`, 1, true)).to.equal(nil)
+                const after = Style.sgrState("", string.sub(painted, 1, (assert(string.find(painted, "b", 1, true)))))
+                expect(string.find(after, `{ESCAPE}1m`, 1, true) ~= nil).to.equal(true)
+            end
+        end)
+
         it("should keep dim text dim around the dot", function()
             const painted = Style.paintPath({ Bold = true, Dim = true }, "a b", true)
             expect(painted).to.equal(`{ESCAPE}1;2ma{ESCAPE}22;2m·{ESCAPE}1mb{ESCAPE}22m`)
+        end)
+    end)
+
+    describe("Style.sgrState", function()
+        it("should retain only active attributes and complete extended colors", function()
+            const rgba = `{ESCAPE}38:6::168:168:168:128m`
+            expect(Style.sgrState("", `{ESCAPE}1;2;3m{rgba}`)).to.equal(`{ESCAPE}1m{ESCAPE}2m{ESCAPE}3m{rgba}`)
+            expect(Style.sgrState(`{ESCAPE}1;2;3;31m`, `{ESCAPE}22;39m`)).to.equal(`{ESCAPE}3m`)
+            expect(Style.sgrState(`{ESCAPE}1;31m`, `{ESCAPE}0m`)).to.equal("")
+            expect(Style.sgrState("", `{ESCAPE}38;2;1;2;3m`)).to.equal(`{ESCAPE}38;2;1;2;3m`)
+            local state = ""
+            for _ = 1, 100 do
+                state = Style.sgrState(state, `{ESCAPE}33mtext`)
+            end
+            expect(state).to.equal(`{ESCAPE}33m`)
         end)
     end)
 

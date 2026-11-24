@@ -30,7 +30,7 @@ const TIMESTAMPS_VARIABLE = "COMMANDLINE_TIMESTAMPS"
 
 export type Clock = {
     Elapsed: () -> number,
-    LocalOffsetMinutes: () -> number,
+    LocalOffsetMinutes: (unixMillis: number) -> number,
     UnixMillis: () -> number,
 }
 
@@ -125,9 +125,7 @@ const function systemClock(): Clock
         Elapsed = function()
             return os.clock() - started
         end,
-        LocalOffsetMinutes = function()
-            return Terminal.localOffsetMinutes(DateTime.now().unixTimestampMillis)
-        end,
+        LocalOffsetMinutes = Terminal.localOffsetMinutes,
         UnixMillis = function()
             return DateTime.now().unixTimestampMillis
         end,
@@ -286,10 +284,11 @@ end
 -- Returns the timestamp prefix for a line written now, including its trailing space, or
 -- an empty string when timestamps are disabled.
 function Terminal.Prefix(self: Terminal): string
+    const unixMillis = self._clock.UnixMillis()
     const faint, text = Timestamp.format(self.Timestamps, {
         ElapsedSeconds = self._clock.Elapsed(),
-        LocalOffsetMinutes = if self.Timestamps.Mode == "Local" then self._clock.LocalOffsetMinutes() else 0,
-        UnixMillis = self._clock.UnixMillis(),
+        LocalOffsetMinutes = if self.Timestamps.Mode == "Local" then self._clock.LocalOffsetMinutes(unixMillis) else 0,
+        UnixMillis = unixMillis,
     })
     if faint == nil or text == nil then
         return ""
@@ -332,9 +331,10 @@ function Terminal.Columns(self: Terminal): number
     return self._columns :: number
 end
 
-const function writeLines(self: Terminal, target: Target, text: string?)
+const function writeLines(self: Terminal, target: Target, text: string?, previousStyle: string?): string
     assert(t.optional(t.string)(text))
 
+    local activeStyle = previousStyle or ""
     const columns = self:Columns()
     const lines = {}
     for line in string.gmatch(`{text or ""}\n`, "([^\n]*)\n") do
@@ -345,11 +345,14 @@ const function writeLines(self: Terminal, target: Target, text: string?)
             continue
         end
         const prefix = self:Prefix()
-        const full = `{prefix}{trimmed}`
+        const styledPrefix = if prefix ~= "" and self.Color then `\u{1b}[0m{prefix}{activeStyle}` else prefix
+        const full = `{styledPrefix}{trimmed}`
+        activeStyle = Style.sgrState(activeStyle, trimmed)
         const wrapped = if columns > 0 then Wrap.line(full, columns, string.rep(" ", Wrap.width(prefix))) else full
         table.insert(lines, `{wrapped}\n`)
     end
     self._write[target](table.concat(lines))
+    return activeStyle
 end
 
 -- Writes text to standard output, prefixing each line with the timestamp.
@@ -372,10 +375,11 @@ function Terminal.Stream(self: Terminal, target: Target?): Stream
 
     const destination: Target = target or "Output"
     local pending = ""
+    local activeStyle = ""
     return {
         Flush = function()
             if pending ~= "" then
-                writeLines(self, destination, pending)
+                activeStyle = writeLines(self, destination, pending, activeStyle)
                 pending = ""
             end
         end,
@@ -384,7 +388,7 @@ function Terminal.Stream(self: Terminal, target: Target?): Stream
             pending ..= chunk
             const lastNewline = string.find(pending, "\n[^\n]*$")
             if lastNewline then
-                writeLines(self, destination, string.sub(pending, 1, lastNewline - 1))
+                activeStyle = writeLines(self, destination, string.sub(pending, 1, lastNewline - 1), activeStyle)
                 pending = string.sub(pending, lastNewline + 1)
             end
         end,

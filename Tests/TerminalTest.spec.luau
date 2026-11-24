@@ -217,6 +217,29 @@ return function()
             expect(table.concat(h.Errors)).to.equal("[00:01.234] Failed.\n")
         end)
 
+        it("should calculate the local offset for the timestamp's sampled instant", function()
+            const h = harness({ Color = false, Timestamps = "local" })
+            const instant = DateTime.fromIsoDate("2026-03-08T06:59:59Z").unixTimestampMillis
+            h.Terminal._clock.UnixMillis = function()
+                return instant
+            end
+            h.Terminal._clock.LocalOffsetMinutes = function(unixMillis)
+                expect(unixMillis).to.equal(instant)
+                return -300
+            end
+            expect(h.Terminal:Prefix()).to.equal("[01:59:59.000] ")
+        end)
+
+        it("should restore message styles after each timestamp prefix", function()
+            const h = harness({ Color = true, Timestamps = "stopwatch" })
+            h.Terminal:Print(h.Terminal:Warning("One\nTwo"))
+            const output = table.concat(h.Output)
+            for _, word in { "One", "Two" } do
+                const position = assert(string.find(output, word, 1, true))
+                expect(Style.sgrState("", string.sub(output, 1, position - 1))).to.equal("\u{1b}[33m")
+            end
+        end)
+
         it("should leave blank lines blank", function()
             const h = harness({ Color = false, Timestamps = "utc" })
             h.Terminal:Print()
@@ -291,6 +314,23 @@ return function()
             expect(table.concat(h.Output)).to.equal(
                 "[00:00.500] Rojo+ server listening.\n[00:00.750] Visit the page.\n[00:00.750] Trailing\n"
             )
+        end)
+
+        it("should retain child SGR state across writes without coloring prefixes", function()
+            const h = harness({ Color = true, Timestamps = "stopwatch" })
+            const stream = h.Terminal:Stream()
+            const color = "\u{1b}[38:6::168:168:168:128m"
+            stream.Write(`\u{1b}[1m{color}One\n`)
+            stream.Write("Two\n\u{1b}[22;39mThree\n")
+            stream.Flush()
+            const output = table.concat(h.Output)
+            for _, word in { "One", "Two" } do
+                const position = assert(string.find(output, word, 1, true))
+                expect(Style.sgrState("", string.sub(output, 1, position - 1))).to.equal(`\u{1b}[1m{color}`)
+            end
+            const third = assert(string.find(output, "Three", 1, true))
+            expect(Style.sgrState("", string.sub(output, 1, third - 1))).to.equal("")
+            expect(Style.strip(output)).to.equal("[00:00.000] One\n[00:00.000] Two\n[00:00.000] Three\n")
         end)
 
         it("should write error streams to standard error", function()
