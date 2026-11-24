@@ -185,6 +185,25 @@ return function()
             )
         end)
 
+        it("should wrap explicit-alpha timestamps using only their visible width", function()
+            for _, color in { true, false } do
+                const h = harness({
+                    Color = color,
+                    Columns = 25,
+                    Theme = {
+                        TimestampBracket = { Color = "#a8a8a8", Opacity = 0.25 },
+                        TimestampFaint = { Color = "#a8a8a8", Opacity = 0.25 },
+                    },
+                    Timestamps = "stopwatch",
+                })
+                h.Advance(0.001)
+                h.Terminal:Print("One two three four.")
+                const output = table.concat(h.Output)
+                expect(Style.strip(output)).to.equal("[00:00.001] One two three\n            four.\n")
+                expect(string.find(output, "38:6::168:168:168:64", 1, true) ~= nil).to.equal(color)
+            end
+        end)
+
         it("should only wrap custom sinks when given a width", function()
             const h = harness({ Color = false })
             expect(h.Terminal:Columns()).to.equal(0)

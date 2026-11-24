@@ -9,16 +9,17 @@ timestamp. Contains no I/O.
 
 --]]
 
+const Style = require("./Style")
 const t = require("@packages/t")
 
-const ESCAPE_PATTERN = "^\u{1b}%[[%d;]*m"
+const ESCAPE_PATTERN = `^{Style.SgrPattern}`
 
 const Wrap = {}
 
 -- Returns the number of columns text takes once escape sequences are removed.
 function Wrap.width(text: string): number
     assert(t.string(text))
-    const visible = string.gsub(text, "\u{1b}%[[%d;]*m", "")
+    const visible = Style.strip(text)
     return utf8.len(visible) or #visible
 end
 
@@ -81,7 +82,7 @@ function Wrap.line(text: string, columns: number, indent: string?): string
         end
         if currentWidth > indentWidth and currentWidth + spacesWidth + wordWidth > columns then
             -- Keep style changes from the dropped spaces, since they may open the word.
-            current ..= string.gsub(spaces, "[^\u{1b}%[%d;m]", "")
+            current ..= string.gsub(spaces, " ", "")
             breakLine()
         else
             current ..= spaces

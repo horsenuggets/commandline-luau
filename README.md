@@ -148,11 +148,13 @@ streamed output, such as a child process's standard output, into timestamped lin
 
 **Themes**
 
-Every theme entry (`Address`, `Count`, `Error`, `Heading`, `Identifier`, `Path`,
-`RobloxPath`, `StepBracket`, `StepCurrent`, `StepTotal`, `Success`, `TimestampBracket`,
-`TimestampFaint`, `TimestampText`, `Url`, and `Warning`) can be overridden with a spec of
-`Bold`, `Color`, `Dim`, `Italic`, and `Underline`. Colors are names like `cyanBright` or
-hex values like `#96cc22`...
+Every theme entry (`Address`, `Count`, `Error`, `Faint`, `Heading`, `Identifier`, `Muted`,
+`Path`, `RobloxPath`, `StepBracket`, `StepCurrent`, `StepTotal`, `Success`,
+`TimestampBracket`, `TimestampFaint`, `TimestampText`, `Url`, and `Warning`) can be
+overridden with a spec of `Bold`, `Color`, `Dim`, `Italic`, and `Underline`. Colors are
+names like `cyanBright` or hex values like `#96cc22`. Secondary text uses solid RGB gray.
+Timestamp brackets and leading zeros use the same gray with `Dim`, whose intensity or
+opacity is controlled by the terminal. For example...
 
 ```luau
 local terminal = Commandline.Terminal.new({
@@ -162,6 +164,18 @@ local terminal = Commandline.Terminal.new({
     },
 })
 ```
+
+For terminals that support foreground RGBA (such as GhosttyX), explicitly set `Opacity`
+from `0` to `1` alongside a hex `Color`. For example,
+`TimestampFaint = { Color = "#a8a8a8", Opacity = 0.25 }` uses alpha `64/255`, approximately
+25%. The same override on `TimestampBracket` fades the brackets. Overrides replace the
+whole spec, so these do not inherit `Dim`. Do not add `Dim` unless you want its intensity
+reduction multiplied by the explicit opacity.
+
+This opts into the `ESC[38:6::R:G:B:Am` terminal extension, not ordinary truecolor. Only
+use it on terminals known to support RGBA; no terminal capability is inferred. Ordinary
+styles omit `Opacity` and keep their existing ANSI output. Closing the foreground style
+restores full opacity, and disabling color emits no RGBA sequences.
 
 Library code such as `Toolkit` prints through `Commandline.Terminal.default()`, so an app
 that calls `setDefault` at startup gets the same timestamps and theme everywhere.

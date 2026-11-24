@@ -26,6 +26,13 @@ return function()
             expect(Style.colorCode("#96cc22")).to.equal("38;2;150;204;34")
         end)
 
+        it("should encode explicit opacity as an RGBA foreground", function()
+            for _, case in { { 0, 0 }, { 0.25, 64 }, { 0.5, 128 }, { 1, 255 } } do
+                expect(Style.colorCode("#a8a8a8", case[1])).to.equal(`38:6::168:168:168:{case[2]}`)
+            end
+            expect(Style.colorCode("gray", 0.25)).to.equal(nil)
+        end)
+
         it("should reject unknown colors", function()
             expect(Style.colorCode("teal")).to.equal(nil)
             expect(Style.colorCode("#12345")).to.equal(nil)
@@ -60,6 +67,35 @@ return function()
             end).to.throw()
         end)
 
+        it("should validate opacity without accepting invalid channels or palette guesses", function()
+            for _, opacity in { -0.1, 1.1, math.huge, -math.huge, 0 / 0 } do
+                expect(Style.validate({ Color = "#a8a8a8", Opacity = opacity })).to.equal(false)
+                if opacity == opacity then
+                    expect(Style.colorCode("#a8a8a8", opacity)).to.equal(nil)
+                else
+                    expect(function()
+                        Style.colorCode("#a8a8a8", opacity)
+                    end).to.throw()
+                end
+                expect(function()
+                    Style.codes({ Color = "#a8a8a8", Opacity = opacity })
+                end).to.throw()
+            end
+            for _, spec in
+                {
+                    { Opacity = 0.25 },
+                    { Color = "gray", Opacity = 0.25 },
+                    { Color = "#12345", Opacity = 0.25 },
+                    { Color = "#a8a8a8", Opacity = "0.25" } :: any,
+                }
+            do
+                expect(Style.validate(spec)).to.equal(false)
+            end
+            const theme = Style.theme({ TimestampFaint = { Color = "#a8a8a8", Opacity = 0.25 } })
+            expect(theme.TimestampFaint.Opacity).to.equal(0.25)
+            expect(theme.TimestampFaint.Dim).to.equal(nil)
+        end)
+
         it("should freeze the theme so it cannot drift after creation", function()
             const theme = Style.theme({ Count = { Bold = false } })
             expect(table.isfrozen(theme)).to.equal(true)
@@ -75,30 +111,39 @@ return function()
             end
         end)
 
-        it("should show counting timestamp digits brighter than their faint lead", function()
-            const function brightness(color: string): number
-                const red, green, blue = string.match(color, "^#(%x%x)(%x%x)(%x%x)$")
-                assert(red and green and blue, `Expected a hex color, got "{color}".`)
-                return (tonumber(red, 16) :: number) + (tonumber(green, 16) :: number) + (tonumber(blue, 16) :: number)
-            end
+        it("should faint timestamp brackets and leading zeros without changing their gray", function()
             const theme = Style.DefaultTheme
-            expect(theme.TimestampBracket.Color).to.equal(theme.TimestampFaint.Color)
-            expect(theme.TimestampFaint.Dim).to.equal(nil)
-            expect(brightness(theme.TimestampText.Color :: string) > brightness(theme.TimestampFaint.Color :: string)).to.equal(
-                true
-            )
+            for _, spec in { theme.TimestampBracket, theme.TimestampFaint } do
+                expect(spec.Color).to.equal(theme.TimestampText.Color)
+                expect(spec.Dim).to.equal(true)
+                expect(Style.paint(spec, "0", true)).to.equal(`{ESCAPE}2;38;2;168;168;168m0{ESCAPE}22;39m`)
+                expect(Style.paint(spec, "0", false)).to.equal("0")
+            end
+            expect(theme.TimestampText.Dim).to.equal(nil)
         end)
 
         it("should share one muted gray across secondary text", function()
             const theme = Style.DefaultTheme :: any
-            for _, key in { "Address", "Identifier", "Path", "StepBracket", "StepTotal", "Url" } do
+            for _, key in
+                {
+                    "Address",
+                    "Identifier",
+                    "Muted",
+                    "Path",
+                    "StepBracket",
+                    "StepTotal",
+                    "TimestampBracket",
+                    "TimestampFaint",
+                    "Url",
+                }
+            do
                 expect(theme[key].Color).to.equal(theme.TimestampText.Color)
             end
         end)
 
-        it("should never rely on dim text in the default theme", function()
-            for _, spec in Style.DefaultTheme :: any do
-                expect(spec.Dim).to.equal(nil)
+        it("should only dim the faint timestamp parts by default", function()
+            for key, spec in Style.DefaultTheme :: any do
+                expect(spec.Dim == true).to.equal(key == "TimestampBracket" or key == "TimestampFaint")
             end
         end)
     end)
@@ -139,6 +184,21 @@ return function()
             )
         end)
 
+        it("should reset alpha after text and preserve outer opacity around nested colors", function()
+            const spec = { Color = "#a8a8a8", Opacity = 0.25 }
+            const opening = `{ESCAPE}38:6::168:168:168:64m`
+            const inner = Style.paint({ Color = "green" }, "inner", true)
+            expect(Style.paint(spec, "x", true)).to.equal(`{opening}x{ESCAPE}39m`)
+            expect(Style.paint(spec, "x", false)).to.equal("x")
+            expect(Style.paint(spec, "", true)).to.equal("")
+            expect(Style.paint(spec, `a {inner} b`, true)).to.equal(
+                `{opening}a {ESCAPE}32minner{ESCAPE}39m{opening} b{ESCAPE}39m`
+            )
+            expect(Style.paint({ Color = "green" }, Style.paint(spec, "x", true), true)).to.equal(
+                `{ESCAPE}32m{opening}x{ESCAPE}39m{ESCAPE}32m{ESCAPE}39m`
+            )
+        end)
+
         it("should return plain text when color is off or the text is empty", function()
             expect(Style.paint({ Bold = true }, "Done.", false)).to.equal("Done.")
             expect(Style.paint({ Bold = true }, "", true)).to.equal("")
@@ -165,7 +225,9 @@ return function()
             for _, parameters in { "", "0", "22", "22;39", "23;24;49" } do
                 expect(Style.isClosing(parameters)).to.equal(true)
             end
-            for _, parameters in { "1", "22;96", "38;2;1;2;3", "39;1" } do
+            for _, parameters in
+                { "1", "22;96", "38;2;1;2;3", "38:6::168:168:168:64", "22;38:6::168:168:168:64", "39;1" }
+            do
                 expect(Style.isClosing(parameters)).to.equal(false)
             end
         end)
@@ -186,6 +248,17 @@ return function()
             expect(painted).to.equal(`{ESCAPE}1;96ma{ESCAPE}22;96m·{ESCAPE}1mb{ESCAPE}22;39m`)
         end)
 
+        it("should preserve path alpha on the unbold dot even inside an opaque color", function()
+            const path = Style.paintPath({ Bold = true, Color = "#a8a8a8", Opacity = 0.25 }, "a b", true)
+            const expected =
+                `{ESCAPE}1;38:6::168:168:168:64ma{ESCAPE}22;38:6::168:168:168:64m·{ESCAPE}1mb{ESCAPE}22;39m`
+            expect(path).to.equal(expected)
+            expect(Style.paint({ Color = "yellow" }, path, true)).to.equal(
+                `{ESCAPE}33m{expected}{ESCAPE}33m{ESCAPE}39m`
+            )
+            expect(Style.paintPath({ Color = "#a8a8a8", Opacity = 0.25 }, "a b", false)).to.equal("a·b")
+        end)
+
         it("should keep dim text dim around the dot", function()
             const painted = Style.paintPath({ Bold = true, Dim = true }, "a b", true)
             expect(painted).to.equal(`{ESCAPE}1;2ma{ESCAPE}22;2m·{ESCAPE}1mb{ESCAPE}22m`)
@@ -195,6 +268,7 @@ return function()
     describe("Style.strip", function()
         it("should remove every escape sequence", function()
             expect(Style.strip(`{ESCAPE}1;38;2;1;2;3mx{ESCAPE}22;39m`)).to.equal("x")
+            expect(Style.strip(`{ESCAPE}1;38:6::168:168:168:64mx{ESCAPE}22;39m`)).to.equal("x")
         end)
     end)
 end

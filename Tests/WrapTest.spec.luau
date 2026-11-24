@@ -19,6 +19,7 @@ return function()
     describe("Wrap.width", function()
         it("should count columns without escape sequences", function()
             expect(Wrap.width(`{ESCAPE}1;96mMy·Place{ESCAPE}22;39m`)).to.equal(8)
+            expect(Wrap.width(`{ESCAPE}38:6::168:168:168:64mMy·Place{ESCAPE}39m`)).to.equal(8)
             expect(Wrap.width("")).to.equal(0)
         end)
     end)
@@ -48,6 +49,21 @@ return function()
             const wrapped = Wrap.line(text, 22)
             expect(Style.strip(wrapped)).to.equal("Opening My·Place.rbxl\nin Studio now.")
             expect(string.gsub(wrapped, "\n", "")).to.equal((string.gsub(text, " in Studio", "in Studio")))
+        end)
+
+        it("should preserve complete RGBA escapes when moving and splitting words", function()
+            const opening = `{ESCAPE}38:6::168:168:168:64m`
+            const closing = `{ESCAPE}39m`
+            expect(Wrap.line(`One {opening}two{closing}`, 3)).to.equal(`One{opening}\ntwo{closing}`)
+            expect(Wrap.line(`{opening}abcdef{closing}`, 2)).to.equal(`{opening}ab\ncd\nef{closing}`)
+            for columns = 1, 12 do
+                const wrapped = Wrap.line(`One {opening}two three{closing}`, columns)
+                for _, line in string.split(wrapped, "\n") do
+                    expect(Wrap.width(line) <= columns).to.equal(true)
+                end
+                expect(string.gsub(Style.strip(wrapped), "%s", "")).to.equal("Onetwothree")
+                expect(string.find(wrapped, opening, 1, true) ~= nil).to.equal(true)
+            end
         end)
 
         it("should never exceed the width or lose words, whatever the width", function()
