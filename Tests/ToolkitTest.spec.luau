@@ -3,19 +3,129 @@
 ToolkitTest.spec
 
 Tests for the Toolkit build utilities. Covers version generation, executable
-building, and completions command creation. Tests use isolated temp directories
-for parallelism.
+building, completions, and install/update progress through configured terminals.
+Install/update tests mock all filesystem, network, process, and binary replacement I/O.
 
 --]]
 
+const Chalk = require("@packages/Chalk")
 const fs = require("@lune/fs")
+const luau = require("@lune/luau")
 const process = require("@lune/process")
+const serde = require("@lune/serde")
+const t = require("@packages/t")
 
 const Commandline = require("@commandline")
+const Terminal = require("../Source/Commandline/Terminal")
 
 const Command = Commandline.Command
 const Flag = Commandline.Flag
 const Toolkit = Commandline.Toolkit
+const TOOLKIT_SOURCE = fs.readFile("Source/Commandline/Toolkit.luau")
+
+type ProgressScenario = {
+    CurrentExecutable: boolean?,
+    DownloadFailure: boolean?,
+    InvalidRelease: boolean?,
+    MissingAsset: boolean?,
+    Os: string?,
+    PathFile: string?,
+    ReleaseFailure: boolean?,
+    ReleaseVersion: string?,
+    TargetVersion: string?,
+}
+
+-- Load the real command implementations with closed I/O boundaries. No missing mock can
+-- fall through to the user's filesystem, network, environment, or executable.
+const function runProgress(commandName: string, terminal: Terminal.Terminal, scenario: ProgressScenario): number?
+    assert(t.string(commandName))
+    assert(t.table(terminal))
+    assert(t.table(scenario))
+
+    local exitCode: number? = nil
+    const exited = {}
+    const dependencies: { [string]: any } = {
+        ["@packages/Chalk"] = Chalk,
+        ["@packages/t"] = t,
+        ["@lune/fs"] = {
+            isDir = function()
+                return true
+            end,
+            isFile = function(path)
+                return path == `/home/test/{scenario.PathFile or ".zshrc"}`
+            end,
+            readFile = function()
+                return ""
+            end,
+            writeDir = function() end,
+            writeFile = function() end,
+        },
+        ["@lune/net"] = {
+            request = function(request)
+                if request.url == "https://example.invalid/binary" then
+                    return { ok = not scenario.DownloadFailure, body = "binary" }
+                end
+                return {
+                    ok = not scenario.ReleaseFailure,
+                    body = if scenario.InvalidRelease
+                        then "not json"
+                        else serde.encode("json", {
+                            tag_name = scenario.ReleaseVersion or "2.0.0",
+                            assets = {},
+                        }),
+                }
+            end,
+        },
+        ["@lune/process"] = {
+            env = { HOME = "/home/test", USERPROFILE = "/home/test" },
+            exec = function()
+                return { ok = true }
+            end,
+            exit = function(code)
+                exitCode = code
+                error(exited, 0)
+            end,
+            os = scenario.Os or "linux",
+        },
+        ["@lune/serde"] = serde,
+        ["@self/Command"] = Command,
+        ["@self/Flag"] = Flag,
+        ["@self/SelfUpdate"] = {
+            cleanupOldBinary = function() end,
+            copyBinary = function() end,
+            findExecutable = function()
+                return if scenario.CurrentExecutable then "/home/test/.mytool/bin/mytool" else nil
+            end,
+            getAssetDownloadUrl = function()
+                return if scenario.MissingAsset then nil else "https://example.invalid/binary"
+            end,
+            getPlatformSuffix = function()
+                return "linux-x86_64"
+            end,
+            replaceBinary = function() end,
+        },
+        ["@self/Terminal"] = Terminal,
+        ["@self/Completions"] = Commandline.Completions,
+    }
+    const toolkit = luau.load(TOOLKIT_SOURCE, {
+        environment = {
+            print = function()
+                error("Human-readable progress bypassed the configured terminal.")
+            end,
+            require = function(path)
+                return assert(dependencies[path], `Unexpected dependency "{path}".`)
+            end,
+        },
+    })()
+    const options = { Name = "mytool", InstallDir = ".mytool", Version = "1.0.0", Repository = "example/mytool" }
+    const command = if commandName == "install" then toolkit.installCommand(options) else toolkit.updateCommand(options)
+    const previous = Terminal.default()
+    Terminal.setDefault(terminal)
+    const ok, problem = pcall(command._impl, { version = scenario.TargetVersion })
+    Terminal.setDefault(previous)
+    assert(ok or problem == exited, tostring(problem))
+    return exitCode
+end
 
 local _counter = 0
 const function createTempDir(): string
@@ -51,6 +161,64 @@ end
 
 const Testable = require("@devpackages/Testable")
 const describe, expect, it = Testable.describe, Testable.expect, Testable.it
+
+const function expectProgress(
+    commandName: string,
+    scenario: ProgressScenario,
+    expectedLines: (Terminal.Terminal) -> { string },
+    expectedExit: number?
+)
+    for _, color in { false, true } do
+        for _, timestamps in { false, true } do
+            local written = ""
+            const config: Terminal.Config = {
+                Clock = {
+                    Elapsed = function()
+                        return 65.25
+                    end,
+                    LocalOffsetMinutes = function()
+                        return 0
+                    end,
+                    UnixMillis = function()
+                        return 0
+                    end,
+                },
+                Color = color,
+                Columns = 0,
+                Env = {},
+                Home = "/home/test",
+                Theme = {
+                    Error = { Color = "magenta" },
+                    Heading = { Color = "cyan" },
+                    Identifier = { Color = "yellow" },
+                    Path = { Color = "blue" },
+                    Success = { Color = "white" },
+                    Warning = { Color = "red" },
+                },
+                Timestamps = if timestamps then "stopwatch" else "off",
+                Write = function(text)
+                    written ..= text
+                end,
+                WriteError = function()
+                    error("Progress unexpectedly changed its output stream.")
+                end,
+            }
+            const terminal = Terminal.new(config)
+            const exitCode = runProgress(commandName, terminal, scenario)
+            local expected = ""
+            config.Write = function(text)
+                expected ..= text
+            end
+            const reference = Terminal.new(config)
+            for _, line in expectedLines(reference) do
+                reference:Print(line)
+            end
+            expect(exitCode).to.equal(expectedExit)
+            expect(written).to.equal(expected)
+            expect(string.find(written, "\u{1b}[", 1, true) ~= nil).to.equal(color)
+        end
+    end
+end
 
 return function()
     describe("generateVersion", function()
@@ -290,6 +458,139 @@ return function()
             end
             cleanup(tempDir)
         end)
+    end)
+
+    describe("install progress", function()
+        for _, scenario in
+            {
+                { CurrentExecutable = true },
+                { PathFile = ".path" },
+                { Os = "windows" },
+            }
+        do
+            it(
+                `should honor terminal settings with {scenario.PathFile or scenario.Os or "a local executable"}`,
+                function()
+                    expectProgress("install", scenario, function(terminal)
+                        const suffix = if scenario.Os == "windows" then ".exe" else ""
+                        const lines = {
+                            terminal:Heading(`Installing mytool {terminal:Identifier("1.0.0")}...`),
+                            "",
+                        }
+                        if scenario.CurrentExecutable then
+                            table.insert(
+                                lines,
+                                `Copied executable to {terminal:Path(`/home/test/.mytool/bin/mytool{suffix}`)}.`
+                            )
+                        else
+                            table.insert(lines, "Downloading binary...")
+                            table.insert(lines, terminal:Success("Downloaded successfully."))
+                        end
+                        table.insert(
+                            lines,
+                            if scenario.Os == "windows"
+                                then `Added {terminal:Path("/home/test/.mytool/bin", { Directory = true })} to user PATH.`
+                                elseif scenario.PathFile == ".path" then `Added {terminal:Path(
+                                    "/home/test/.mytool/bin",
+                                    { Directory = true }
+                                )} to {terminal:Path("/home/test/.path")}.`
+                                else `Added {terminal:Identifier("mytool")} to {terminal:Path("/home/test/.zshrc")}.`
+                        )
+                        table.insert(lines, "")
+                        table.insert(lines, terminal:Success("Installation complete!"))
+                        table.insert(lines, terminal:Warning("Restart your terminal for PATH changes to take effect."))
+                        return lines
+                    end, nil)
+                end
+            )
+        end
+
+        for _, failure in
+            {
+                { Scenario = { ReleaseFailure = true }, Message = "Failed to fetch latest release." },
+                { Scenario = { InvalidRelease = true }, Message = "Failed to parse release data." },
+                {
+                    Scenario = { MissingAsset = true },
+                    Message = 'Asset "mytool-linux-x86_64" not found in latest release.',
+                },
+                { Scenario = { DownloadFailure = true }, Message = "Failed to download binary." },
+            }
+        do
+            it(`should route install errors through the terminal when {failure.Message}`, function()
+                expectProgress("install", failure.Scenario, function(terminal)
+                    const message = if failure.Scenario.MissingAsset
+                        then `Asset "{terminal:Identifier("mytool-linux-x86_64")}" not found in latest release.`
+                        else failure.Message
+                    return {
+                        terminal:Heading(`Installing mytool {terminal:Identifier("1.0.0")}...`),
+                        "",
+                        "Downloading binary...",
+                        terminal:Error(message),
+                        terminal:Error("Failed to install. Could not download binary."),
+                    }
+                end, 1)
+            end)
+        end
+    end)
+
+    describe("update progress", function()
+        it("should honor terminal settings throughout a successful update", function()
+            expectProgress("update", { CurrentExecutable = true }, function(terminal)
+                return {
+                    terminal:Heading("Checking for updates to mytool..."),
+                    `Updating from {terminal:Identifier("1.0.0")} to {terminal:Identifier("2.0.0")}...`,
+                    "",
+                    terminal:Success(`Updated to {terminal:Identifier("2.0.0")}!`),
+                }
+            end, nil)
+        end)
+
+        it("should honor terminal settings when already up to date", function()
+            expectProgress("update", { ReleaseVersion = "1.0.0" }, function(terminal)
+                return {
+                    terminal:Heading("Checking for updates to mytool..."),
+                    `Already on the latest version ({terminal:Identifier("1.0.0")}).`,
+                }
+            end, nil)
+        end)
+
+        for _, scenario in
+            {
+                { ReleaseFailure = true },
+                { InvalidRelease = true },
+                { ReleaseFailure = true, TargetVersion = "missing" },
+                { MissingAsset = true },
+                { DownloadFailure = true },
+                {},
+            }
+        do
+            it(`should preserve update failure output and exits for {serde.encode("json", scenario)}`, function()
+                expectProgress("update", scenario, function(terminal)
+                    const lines = { terminal:Heading("Checking for updates to mytool...") }
+                    local message: string
+                    if scenario.ReleaseFailure or scenario.InvalidRelease then
+                        message = if scenario.TargetVersion
+                            then `Version "{terminal:Identifier(scenario.TargetVersion)}" not found.`
+                            else "Failed to fetch latest release."
+                    else
+                        table.insert(
+                            lines,
+                            `Updating from {terminal:Identifier("1.0.0")} to {terminal:Identifier("2.0.0")}...`
+                        )
+                        message = if scenario.MissingAsset
+                            then `Binary for {terminal:Identifier("linux-x86_64")} not found in release {terminal:Identifier(
+                                "2.0.0"
+                            )}.`
+                            elseif scenario.DownloadFailure then "Failed to download update."
+                            else `Could not find {terminal:Identifier("mytool")} on PATH. Run "{terminal:Identifier(
+                                "mytool install"
+                            )}" first.`
+                    end
+                    table.insert(lines, terminal:Error(message))
+                    return lines
+                end, 1)
+            end)
+        end
     end)
 
     describe("completionsCommand", function()
