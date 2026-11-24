@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.10
+
+- Avoided per-character tokenization of plain streamed output when tracking SGR state.
+- Preserved previous-state canonicalization, resets, colors, and split escape sequences.
+
 ## 0.2.9
 
 - Kept explicit, default, and error-following command help untimestamped and preformatted.

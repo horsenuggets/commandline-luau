@@ -316,8 +316,12 @@ end
 function Style.sgrState(previous: string, text: string): string
     assert(t.string(previous))
     assert(t.string(text))
+    -- Plain text cannot change SGR state unless it completes a previous escape.
+    -- Still parse previous so combined attributes, overrides, and resets canonicalize.
+    const pending = string.sub(previous, -1) == "\u{1b}" or string.find(previous, "\u{1b}%[[%d;:]*$") ~= nil
+    const input = if pending or string.find(text, "\u{1b}", 1, true) then `{previous}{text}` else previous
     const active: { [number]: string } = {}
-    for _, token in Text.tokens(`{previous}{text}`) do
+    for _, token in Text.tokens(input) do
         const parameters = if token.Escape then string.match(token.Text, "^\u{1b}%[([%d;:]*)m$") else nil
         if parameters == nil then
             continue
