@@ -13,6 +13,7 @@ const Arg = require("./Arg")
 const Chalk = require("@packages/Chalk")
 const Flag = require("./Flag")
 const StringUtils = require("./Helpers/StringUtils")
+const Style = require("./Terminal/Style")
 const TypeUtils = require("./Helpers/TypeUtils")
 const t = require("@packages/t")
 
@@ -76,6 +77,7 @@ const ICommandlineOptions = t.strictInterface({
     Subcommands = t.optional(t.array(t.any)),
     Impl = t.optional(t.callback),
 })
+const HELP_GRAY = Chalk.hex(Style.DefaultTheme.Muted.Color :: string)
 const ITokens = t.array(t.string)
 
 const Command = {}
@@ -241,23 +243,26 @@ function Command._makeHelpMessage(self: Command): string
         end
     end
 
-    const usageLine = `{Chalk.gray(`> {table.concat(usageParts, " ")}`)}`
+    const usageLine = `{HELP_GRAY(`> {table.concat(usageParts, " ")}`)}`
 
     const messageParts = {
+        `{Chalk.italic(HELP_GRAY(`{self.Description}`))}`,
         ``,
-        `{Chalk.bold(self._commandPath)}{if self.Version
-            then ` {Chalk.gray(`[{Chalk.greenBright(self.Version)}]`)}`
-            else ``}`,
-        `{Chalk.italic(Chalk.gray(`{self.Description}`))}`,
-        ``,
-        `{Chalk.gray(`[{Chalk.yellow(`Usage`)}]`)}`,
+        `{HELP_GRAY(`[{Chalk.yellow(`Usage`)}]`)}`,
         usageLine,
     }
+    if self._commandPath == self.Name then
+        table.insert(
+            messageParts,
+            1,
+            `{Chalk.bold(self.Name)}{if self.Version then ` {HELP_GRAY(`[{Chalk.greenBright(self.Version)}]`)}` else ``}`
+        )
+    end
 
     -- Add Flags section if present
     if #self._flags > 0 then
         table.insert(messageParts, ``)
-        table.insert(messageParts, `{Chalk.gray(`[{Chalk.yellow(`Flags`)}]`)}`)
+        table.insert(messageParts, `{HELP_GRAY(`[{Chalk.yellow(`Flags`)}]`)}`)
 
         -- Sort flags alphabetically, keeping help and version last
         const AUTO_FLAGS = { help = true, version = true }
@@ -284,8 +289,8 @@ function Command._makeHelpMessage(self: Command): string
 
             -- Build the Flag line
             const flagLine =
-                `{Chalk.gray(`> `)}{table.concat(flagParts, Chalk.gray(", "))} {Chalk.gray("--")} {Chalk.italic(
-                    Chalk.gray(flag.Description)
+                `{HELP_GRAY(`> `)}{table.concat(flagParts, HELP_GRAY(", "))} {HELP_GRAY("--")} {Chalk.italic(
+                    HELP_GRAY(flag.Description)
                 )}`
             table.insert(messageParts, flagLine)
         end
@@ -294,15 +299,15 @@ function Command._makeHelpMessage(self: Command): string
     -- Add subcommands section if present
     if #self._subcommands > 0 then
         table.insert(messageParts, ``)
-        table.insert(messageParts, `{Chalk.gray(`[{Chalk.yellow(`Subcommands`)}]`)}`)
+        table.insert(messageParts, `{HELP_GRAY(`[{Chalk.yellow(`Subcommands`)}]`)}`)
         const sortedSubcommands = table.clone(self._subcommands)
         table.sort(sortedSubcommands, function(a, b)
             return a.Name < b.Name
         end)
         for _, subcommand in sortedSubcommands do
             const subcommandLine =
-                `{Chalk.gray(`> `)}{Chalk.blueBright(subcommand.Name)} {Chalk.gray("--")} {Chalk.italic(
-                    Chalk.gray(subcommand.Description)
+                `{HELP_GRAY(`> `)}{Chalk.blueBright(subcommand.Name)} {HELP_GRAY("--")} {Chalk.italic(
+                    HELP_GRAY(subcommand.Description)
                 )}`
             table.insert(messageParts, subcommandLine)
         end
@@ -325,7 +330,7 @@ function Command.ShowHelp(self: Command)
 end
 
 function Command._printError(self: Command, message: string)
-    print(Chalk.red(`[Error] {message}`))
+    print(`{Chalk.red(message)}\n`)
 end
 
 function Command._findFlagByName(self: Command, name: string): Flag.Flag?
@@ -358,25 +363,25 @@ function Command._parseFlag(
 
     if isShorthand then
         if #token ~= 2 or token:sub(1, 1) ~= "-" then
-            return nil, `Invalid shorthand Flag format {Chalk.bold(token)}.`
+            return nil, `Invalid shorthand flag format {Chalk.bold(token)}.`
         end
 
         const shorthand = token:sub(2, 2)
         flagDef = self:_findFlagByShorthand(shorthand)
 
         if not flagDef then
-            return nil, `Unknown Flag {Chalk.bold(`-{shorthand}`)}.`
+            return nil, `Unknown flag {Chalk.bold(`-{shorthand}`)}.`
         end
     else
         if #token <= 2 or token:sub(1, 2) ~= "--" then
-            return nil, `Invalid shorthand Flag format {Chalk.bold(token)}.`
+            return nil, `Invalid shorthand flag format {Chalk.bold(token)}.`
         end
 
         const flagName = token:sub(3)
         flagDef = self:_findFlagByName(flagName)
 
         if not flagDef then
-            return nil, `Unknown Flag {Chalk.bold(`--{flagName}`)}.`
+            return nil, `Unknown flag {Chalk.bold(`--{flagName}`)}.`
         end
     end
 
@@ -390,7 +395,7 @@ function Command._parseFlag(
     index += 1
     if index > #tokens then
         const flagDisplay = isShorthand and `-{token:sub(2, 2)}` or `--{flagDef.Name}`
-        return nil, `Flag {Chalk.bold(flagDisplay)} requires a value.`
+        return nil, `flag {Chalk.bold(flagDisplay)} requires a value.`
     end
     const flagValueToken = tokens[index]
 
@@ -398,7 +403,7 @@ function Command._parseFlag(
     const flagValue, castErr = TypeUtils.castFromString(flagValueToken, flagDef.Type)
     if castErr then
         const flagDisplay = isShorthand and `-{token:sub(2, 2)}` or `--{flagDef.Name}`
-        return nil, `Flag {Chalk.bold(flagDisplay)} - {castErr}`
+        return nil, `flag {Chalk.bold(flagDisplay)} - {castErr}`
     end
 
     parsedFlags[flagDef.Name] = { Value = flagValue }
@@ -426,11 +431,11 @@ function Command._parsePositionalArgs(self: Command, positionalArgs: { string })
 
     -- Validate Arg count
     if #positionalArgs < requiredArgCount then
-        return nil, "Missing required Args."
+        return nil, "Missing required args."
     end
 
     if #positionalArgs > #self._args then
-        return nil, "Too many Args provided."
+        return nil, "Too many args provided."
     end
 
     -- Map positional Args to definitions

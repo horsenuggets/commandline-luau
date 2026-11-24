@@ -8,11 +8,47 @@ subcommands, and help generation.
 --]]
 
 const Arg = require("../Source/Commandline/Arg")
+const Chalk = require("@packages/Chalk")
 const Command = require("../Source/Commandline/Command")
 const Flag = require("../Source/Commandline/Flag")
+const StringUtils = require("../Source/Commandline/Helpers/StringUtils")
+const Style = require("../Source/Commandline/Terminal/Style")
+const TypeUtils = require("../Source/Commandline/Helpers/TypeUtils")
+const fs = require("@lune/fs")
+const luau = require("@lune/luau")
+const t = require("@packages/t")
 
 const Testable = require("@devpackages/Testable")
 const describe, expect, it = Testable.describe, Testable.expect, Testable.it
+
+const COMMAND_SOURCE = fs.readFile("Source/Commandline/Command.luau")
+const function executeWithOutput(makeCommand: (typeof(Command)) -> Command.Command, tokens: { string }): string
+    assert(t.callback(makeCommand))
+    assert(t.array(t.string)(tokens))
+
+    const output = {}
+    const dependencies = {
+        ["./Arg"] = Arg,
+        ["./Flag"] = Flag,
+        ["./Helpers/StringUtils"] = StringUtils,
+        ["./Helpers/TypeUtils"] = TypeUtils,
+        ["./Terminal/Style"] = Style,
+        ["@packages/Chalk"] = Chalk,
+        ["@packages/t"] = t,
+    }
+    const isolatedCommand = luau.load(COMMAND_SOURCE, {
+        environment = {
+            print = function(message)
+                table.insert(output, `{message}\n`)
+            end,
+            require = function(path)
+                return assert(dependencies[path], `Unexpected dependency "{path}".`)
+            end,
+        },
+    })()
+    makeCommand(isolatedCommand):Execute(tokens)
+    return table.concat(output)
+end
 
 return function()
     describe("Command.new", function()
@@ -562,7 +598,92 @@ return function()
         end)
     end)
 
+    describe("Command output", function()
+        it("should print unlabelled red errors followed by one blank line before help", function()
+            const cases = {
+                { Message = "Missing required args.", Tokens = { "open" } },
+                { Message = "Too many args provided.", Tokens = { "open", "one", "two" } },
+                { Message = "Unknown flag --unknown.", Tokens = { "open", "--unknown" } },
+                { Message = "Unknown flag -u.", Tokens = { "open", "-u" } },
+                { Message = "Invalid shorthand flag format -bad.", Tokens = { "open", "-bad" } },
+                { Message = "Invalid shorthand flag format --.", Tokens = { "open", "--" } },
+                { Message = "flag --count requires a value.", Tokens = { "open", "--count" } },
+                { Message = "flag -c requires a value.", Tokens = { "open", "-c" } },
+                {
+                    Message = 'flag --count - Unable to cast "bad" to int. Not a valid number.',
+                    Tokens = { "open", "--count", "bad" },
+                },
+                {
+                    Message = 'flag -c - Unable to cast "bad" to int. Not a valid number.',
+                    Tokens = { "open", "-c", "bad" },
+                },
+                { Message = "Unknown subcommand unknown.", Tokens = { "unknown" } },
+            }
+            for _, case in cases do
+                const output = executeWithOutput(function(command)
+                    return command.new({
+                        Name = "app",
+                        Description = "Manage places.",
+                        Subcommands = {
+                            command.new({
+                                Name = "open",
+                                Description = "Open a place.",
+                                Args = { Arg.new({ Name = "place" }) },
+                                Flags = { Flag.new({ Name = "count", Shorthand = "c", Type = "int" }) },
+                            }),
+                        },
+                    })
+                end, case.Tokens)
+                const lines = string.split(Style.strip(output), "\n")
+                expect(lines[1]).to.equal(case.Message)
+                expect(lines[2]).to.equal("")
+                expect(lines[3]).to.equal(if case.Tokens[1] == "open" then "Open a place." else "app")
+                expect(string.sub(output, 1, 5)).to.equal("\u{1b}[31m")
+                expect(string.find(output, "[Error]", 1, true)).to.equal(nil)
+            end
+        end)
+
+        it("should start explicit subcommand help at its description without a blank line", function()
+            const output = executeWithOutput(function(command)
+                return command.new({
+                    Name = "app",
+                    Subcommands = { command.new({ Name = "open", Description = "Open a place." }) },
+                })
+            end, { "open", "--help" })
+            expect(string.split(Style.strip(output), "\n")[1]).to.equal("Open a place.")
+        end)
+    end)
+
     describe("Command.ShowHelp", function()
+        it("should preserve root headings with and without a version and no opening blank line", function()
+            for _, version in { "", "1.2.3" } do
+                const cmd = Command.new({
+                    Name = "app",
+                    Description = "Manage places.",
+                    Version = if version == "" then nil else version,
+                })
+                const lines = string.split(Style.strip(cmd._helpMessage), "\n")
+                expect(lines[1]).to.equal(if version == "" then "app" else "app [1.2.3]")
+                expect(lines[2]).to.equal("Manage places.")
+                expect(lines[3]).to.equal("")
+                expect(lines[4]).to.equal("[Usage]")
+                expect(string.find(cmd._helpMessage, Chalk.bold("app"), 1, true)).to.equal(1)
+            end
+        end)
+
+        it("should use the shared lighter gray for secondary help text", function()
+            const cmd = Command.new({
+                Name = "app",
+                Description = "Manage places.",
+                Version = "1.2.3",
+                Subcommands = { Command.new({ Name = "open", Description = "Open a place." }) },
+            })
+            const muted = Chalk.hex(Style.DefaultTheme.Muted.Color :: string)
+            expect(string.find(cmd._helpMessage, Chalk.italic(muted(cmd.Description)), 1, true)).to.be.ok()
+            expect(string.find(cmd._helpMessage, Chalk.italic(muted("Open a place.")), 1, true)).to.be.ok()
+            expect(string.find(cmd._helpMessage, "\u{1b}[90m", 1, true)).to.equal(nil)
+        end)
+
         it("should generate help message", function()
             const cmd = Command.new({
                 Name = "test",
@@ -601,6 +722,14 @@ return function()
             })
             expect(middle._commandPath).to.equal("app api-key")
             expect(leaf._commandPath).to.equal("app api-key list")
+            for _, command in { middle, leaf } do
+                const lines = string.split(Style.strip(command._helpMessage), "\n")
+                expect(lines[1]).to.equal(command.Description)
+                expect(lines[2]).to.equal("")
+                expect(lines[3]).to.equal("[Usage]")
+                expect(string.find(lines[4], command._commandPath, 1, true)).to.be.ok()
+                expect(string.find(command._helpMessage, Chalk.bold(command._commandPath), 1, true)).to.equal(nil)
+            end
         end)
 
         it("should include command path in help message", function()
