@@ -956,11 +956,11 @@ return function()
                 expect(
                     string.find(
                         command:_makeHelpMessage(),
-                        Terminal.default():Paint("Emphasis", command._commandPath),
+                        Terminal.default():Paint("HelpCommand", command._commandPath),
                         1,
                         true
                     )
-                ).to.equal(nil)
+                ).to.be.ok()
             end
         end)
 

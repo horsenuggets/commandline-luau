@@ -133,7 +133,8 @@ const function completeZsh(command: any, input: string): string
 end
 
 const Testable = require("@devpackages/Testable")
-const describe, expect, it = Testable.describe, Testable.expect, Testable.it
+const afterEach, beforeEach, describe, expect, it =
+    Testable.afterEach, Testable.beforeEach, Testable.describe, Testable.expect, Testable.it
 
 return function()
     describe("generate", function()
@@ -210,6 +211,15 @@ return function()
     end)
 
     describe("zsh", function()
+        local previousTerminal = Terminal.default()
+        beforeEach(function()
+            previousTerminal = Terminal.default()
+            Terminal.setDefault(Terminal.new({ Color = true, Env = {} }))
+        end)
+        afterEach(function()
+            Terminal.setDefault(previousTerminal)
+        end)
+
         it("should honor the current shared theme and NO_COLOR when generating displays", function()
             const previous = Terminal.default()
             const command = makeCommandWithSubcommands()
