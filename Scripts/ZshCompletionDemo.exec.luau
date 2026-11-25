@@ -65,6 +65,12 @@ function ZshCompletionDemo.exec()
         }
     })
     const completion = Commandline.Completions.zsh(command)
+    const terminal = Commandline.Terminal.default()
+    const prompt = string.gsub(
+        `{terminal:Warning("Completion demo")} {terminal:Paint("HelpCommand", "%~")}\n> `,
+        "\u{1b}%[[%d;:]*m",
+        "%%{%0%%}"
+    )
     const sessionDir = `{tostring(project)}/Build/ZshCompletionDemo/{os.time()}-{math.random(1, 1e9)}`
     fs.writeDir(sessionDir)
     fs.writeFile(
@@ -83,7 +89,7 @@ function ZshCompletionDemo.exec()
                 print -r -- "Demo only. No command was executed. Arguments were $*." >&2
             fi
         }
-        PROMPT='%F{yellow}Completion demo%f %F{blue}%~%f'$'\n''> '
+        PROMPT="$COMMANDLINE_DEMO_PROMPT"
         RPROMPT=''
         bindkey -e
         print -r -- 'Press Tab after "ae ", "ae --", and "ae -".'
@@ -94,10 +100,12 @@ function ZshCompletionDemo.exec()
     )
     const ok, result = pcall(process.exec, "zsh", { "-d", "-i" }, {
         env = {
-            ZDOTDIR = sessionDir,
             COMMANDLINE_DEMO_COMPLETION = completion,
-            COMMANDLINE_DEMO_HELP = command._helpMessage
+            COMMANDLINE_DEMO_HELP = command:_makeHelpMessage(),
+            COMMANDLINE_DEMO_PROMPT = prompt,
+            ZDOTDIR = sessionDir
         },
+        inheritStdin = true,
         stdio = "inherit"
     })
     fs.removeDir(sessionDir)

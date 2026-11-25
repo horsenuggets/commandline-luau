@@ -283,6 +283,24 @@ return function()
 
         const available, probe = pcall(process.exec, "zsh", { "-f", "-c", "zmodload zsh/zpty" })
         const shellTest = if available and probe.ok then it else Testable.itSKIP
+        if process.os ~= "windows" then
+            for _, noColor in { false, true } do
+                shellTest(`should show themed help in the isolated demo with NO_COLOR set to {noColor}`, function()
+                    const result = process.exec(`{tostring(project)}/Scripts/ZshCompletionDemo.exec.luau`, {}, {
+                        env = { NO_COLOR = if noColor then "1" else "" },
+                        stdio = { stdin = "ae --help\nexit\n" }
+                    })
+                    const output = `{result.stdout}{result.stderr}`
+                    assert(result.ok, output)
+                    const plain = Commandline.Style.strip(output)
+                    expect(string.find(plain, "Manage an example application.", 1, true)).to.be.ok()
+                    expect(string.find(plain, "[Usage]", 1, true)).to.be.ok()
+                    expect(string.find(plain, "Completion demo", 1, true)).to.be.ok()
+                    expect(string.find(output, "\u{1b}[38;2;", 1, true) ~= nil).to.equal(not noColor)
+                    expect(string.find(output, "\u{1b}[38;5;", 1, true)).to.equal(nil)
+                end)
+            end
+        end
         for _, case in
             {
                 { Input = "mytool ", Inserted = "mytool ", Matches = 3 },
