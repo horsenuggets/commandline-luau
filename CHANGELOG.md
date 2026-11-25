@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.11
+
+- Applied a shared explicit RGB palette to built-in help, diagnostics, and progress output.
+- Used foreground opacity only when the terminal confirms support, with RGB gray otherwise.
+- Forwarded the shared semantic theme and color setting to every native prompt kind.
+- Rendered help against the current theme and preserved disabled-color output.
+
 ## 0.2.10
 
 - Avoided per-character tokenization of plain streamed output when tracking SGR state.
