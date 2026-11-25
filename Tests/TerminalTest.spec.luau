@@ -392,6 +392,44 @@ return function()
             expect(plain).to.equal(Style.paintPath(colored.Theme.Path, "/tmp/notes.txt", true))
         end)
 
+        it("should shorten filesystem paths before styling without changing other helpers", function()
+            for _, color in { false, true } do
+                const terminal = harness({ Color = color, Home = "/Users/user" }).Terminal
+                for _, extension in { ".rbxl", ".txt" } do
+                    for _, directory in { false, true } do
+                        const suffix = if directory then "/" else ""
+                        const path = `/Users/user/projects/a-very-long-project-name/Build/Place{extension}`
+                        const expected = `.../Build/Place{extension}{suffix}`
+                        const theme = if extension == ".rbxl" and not directory
+                            then terminal.Theme.RobloxPath
+                            else terminal.Theme.Path
+                        expect(terminal:Path(path, { Directory = directory })).to.equal(
+                            Style.paintPath(theme, expected, color)
+                        )
+                    end
+                end
+                const shortHomePath = "/Users/user/Build/Place.rbxl"
+                expect(Style.strip(terminal:Path(shortHomePath))).to.equal("~/Build/Place.rbxl")
+                const instance = `Workspace.{string.rep("LongModelName.", 5)}Part`
+                expect(Style.strip(terminal:RobloxPath(instance))).to.equal(instance)
+                const url = `https://example.com/{string.rep("folder/", 10)}`
+                expect(Style.strip(terminal:Url(url))).to.equal(url)
+            end
+        end)
+
+        it("should keep long build results on one line at narrow and wide widths", function()
+            for _, color in { false, true } do
+                for _, columns in { 60, 100, 200 } do
+                    const h = harness({ Color = color, Columns = columns, Timestamps = "stopwatch" })
+                    const path = "~/projects/game/.wt/bugfix/first-party-static-analysis/Build/Place.dev.rbxl"
+                    h.Terminal:Print(`Built {h.Terminal:Path(path)}.`)
+                    expect(Style.strip(table.concat(h.Output))).to.equal(
+                        "[00:00.000] Built .../Build/Place.dev.rbxl.\n"
+                    )
+                end
+            end
+        end)
+
         it("should paint each helper with its own theme entry", function()
             const terminal = harness({ Color = true }).Terminal
             const helpers = {

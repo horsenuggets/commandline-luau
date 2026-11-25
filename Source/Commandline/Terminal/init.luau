@@ -311,6 +311,7 @@ end
     Paints a filesystem path in its display form. Place and model files use the Roblox
     path style, and every other path uses the plain path style. Pass Directory to end the
     path with a slash, and Home to collapse a different folder than the terminal's own.
+    Long paths drop leading folders to fit within 40 terminal columns.
 ]]
 function Terminal.Path(self: Terminal, path: string, options: PathOptions?): string
     assert(t.string(path))
@@ -323,7 +324,7 @@ function Terminal.Path(self: Terminal, path: string, options: PathOptions?): str
     const home = if options ~= nil and options.Home ~= nil then options.Home else self.Home
     const display = Path.display(path, home, directory)
     const key = if not directory and Path.isRobloxFile(display) then "RobloxPath" else "Path"
-    return Style.paintPath(effectiveSpec(self, key), display, self.Color)
+    return Style.paintPath(effectiveSpec(self, key), Path.shorten(display), self.Color)
 end
 
 -- Native prompts take their colors from the same theme as rendered terminal messages.
