@@ -11,6 +11,14 @@ overridden. Contains no I/O, so callers decide whether color is enabled.
 const Text = require("./Text")
 const t = require("@packages/t")
 
+const BLUE = "#7AA2F7"
+const CYAN = "#7DCFFF"
+const FAINT_GRAY = "#5A5A5A"
+const GREEN = "#9ECE6A"
+const MUTED_GRAY = "#A8A8A8"
+const RED = "#F7768E"
+const WHITE = "#C0CAF5"
+const YELLOW = "#E0AF68"
 const CLOSING_PARAMETERS = {
     ["0"] = true,
     ["22"] = true,
@@ -67,9 +75,15 @@ export type Spec = {
 export type Theme = {
     Address: Spec,
     Count: Spec,
+    Emphasis: Spec,
     Error: Spec,
     Faint: Spec,
     Heading: Spec,
+    HelpArgument: Spec,
+    HelpCommand: Spec,
+    HelpDescription: Spec,
+    HelpHeading: Spec,
+    HelpVersion: Spec,
     Identifier: Spec,
     Muted: Spec,
     Path: Spec,
@@ -87,31 +101,33 @@ export type Theme = {
 
 export type ThemeOverrides = { [string]: Spec }
 
--- Secondary text uses one muted gray. Timestamp brackets and leading zeros use the same
--- color with ANSI faint, letting the terminal apply its faint opacity. Gallery dividers
--- retain a separate solid faint gray.
-const FAINT_GRAY = "#5a5a5a"
-const MUTED_GRAY = "#a8a8a8"
-
+-- The palette is independent of the terminal's named colors. Terminal resolves opacity
+-- against its capabilities before painting, using the faint gray when unsupported.
 const DEFAULT_THEME: Theme = table.freeze({
     Address = table.freeze({ Color = MUTED_GRAY }),
-    Count = table.freeze({ Bold = true, Color = "yellowBright" }),
-    Error = table.freeze({ Color = "red" }),
+    Count = table.freeze({ Bold = true, Color = YELLOW }),
+    Emphasis = table.freeze({ Bold = true }),
+    Error = table.freeze({ Color = RED }),
     Faint = table.freeze({ Color = FAINT_GRAY }),
-    Heading = table.freeze({ Bold = true, Color = "blueBright" }),
+    Heading = table.freeze({ Bold = true, Color = BLUE }),
+    HelpArgument = table.freeze({ Color = WHITE }),
+    HelpCommand = table.freeze({ Color = BLUE }),
+    HelpDescription = table.freeze({ Color = MUTED_GRAY, Italic = true }),
+    HelpHeading = table.freeze({ Color = YELLOW }),
+    HelpVersion = table.freeze({ Color = GREEN }),
     Identifier = table.freeze({ Color = MUTED_GRAY }),
     Muted = table.freeze({ Color = MUTED_GRAY }),
     Path = table.freeze({ Color = MUTED_GRAY }),
-    RobloxPath = table.freeze({ Bold = true, Color = "cyanBright" }),
+    RobloxPath = table.freeze({ Bold = true, Color = CYAN }),
     StepBracket = table.freeze({ Color = MUTED_GRAY }),
-    StepCurrent = table.freeze({ Bold = true, Color = "yellowBright" }),
+    StepCurrent = table.freeze({ Bold = true, Color = YELLOW }),
     StepTotal = table.freeze({ Color = MUTED_GRAY }),
-    Success = table.freeze({ Bold = true, Color = "greenBright" }),
-    TimestampBracket = table.freeze({ Color = MUTED_GRAY, Dim = true }),
-    TimestampFaint = table.freeze({ Color = MUTED_GRAY, Dim = true }),
+    Success = table.freeze({ Bold = true, Color = GREEN }),
+    TimestampBracket = table.freeze({ Color = MUTED_GRAY, Opacity = 0.5 }),
+    TimestampFaint = table.freeze({ Color = MUTED_GRAY, Opacity = 0.5 }),
     TimestampText = table.freeze({ Color = MUTED_GRAY }),
     Url = table.freeze({ Color = MUTED_GRAY }),
-    Warning = table.freeze({ Color = "yellow" })
+    Warning = table.freeze({ Color = YELLOW })
 }) :: any
 
 const specCheck = t.strictInterface({
@@ -189,6 +205,30 @@ function Style.theme(overrides: ThemeOverrides?): Theme
         theme[key] = table.freeze(table.clone(spec))
     end
     return table.freeze(theme) :: Theme
+end
+
+-- Resolves optional foreground opacity without depending on a terminal's faint setting.
+-- The low-level encoder remains available for callers that already know their terminal.
+function Style.resolve(spec: Spec, foregroundOpacity: boolean, faintColor: string): Spec
+    assert(t.table(spec))
+    assert(t.boolean(foregroundOpacity))
+    assert(t.string(faintColor))
+
+    if spec.Opacity == nil and not spec.Dim then
+        return spec
+    end
+    const resolved = table.clone(spec)
+    resolved.Dim = nil
+    const opacity = spec.Opacity or 0.5
+    if opacity == 1 then
+        resolved.Opacity = nil
+    elseif foregroundOpacity and spec.Color and Style.colorCode(spec.Color, opacity) then
+        resolved.Opacity = opacity
+    else
+        resolved.Color = faintColor
+        resolved.Opacity = nil
+    end
+    return resolved
 end
 
 -- Returns the escape sequences that turn a spec on and off. Each closing code only resets

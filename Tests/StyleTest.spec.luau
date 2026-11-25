@@ -115,15 +115,16 @@ return function()
             end
         end)
 
-        it("should faint timestamp brackets and leading zeros without changing their gray", function()
+        it("should request explicit opacity for timestamp brackets and leading zeros", function()
             const theme = Style.DefaultTheme
             for _, spec in { theme.TimestampBracket, theme.TimestampFaint } do
                 expect(spec.Color).to.equal(theme.TimestampText.Color)
-                expect(spec.Dim).to.equal(true)
-                expect(Style.paint(spec, "0", true)).to.equal(`{ESCAPE}2;38;2;168;168;168m0{ESCAPE}22;39m`)
+                expect(spec.Opacity).to.equal(0.5)
+                expect(spec.Dim).to.equal(nil)
+                expect(Style.paint(spec, "0", true)).to.equal(`{ESCAPE}38:6::168:168:168:128m0{ESCAPE}39m`)
                 expect(Style.paint(spec, "0", false)).to.equal("0")
             end
-            expect(theme.TimestampText.Dim).to.equal(nil)
+            expect(theme.TimestampText.Opacity).to.equal(nil)
         end)
 
         it("should share one muted gray across secondary text", function()
@@ -145,9 +146,77 @@ return function()
             end
         end)
 
-        it("should only dim the faint timestamp parts by default", function()
+        it("should use the approved RGB palette for every colored role without ANSI faint", function()
+            const palette = {
+                Address = "#A8A8A8",
+                Count = "#E0AF68",
+                Error = "#F7768E",
+                Faint = "#5A5A5A",
+                Heading = "#7AA2F7",
+                HelpArgument = "#C0CAF5",
+                HelpCommand = "#7AA2F7",
+                HelpDescription = "#A8A8A8",
+                HelpHeading = "#E0AF68",
+                HelpVersion = "#9ECE6A",
+                Identifier = "#A8A8A8",
+                Muted = "#A8A8A8",
+                Path = "#A8A8A8",
+                RobloxPath = "#7DCFFF",
+                StepBracket = "#A8A8A8",
+                StepCurrent = "#E0AF68",
+                StepTotal = "#A8A8A8",
+                Success = "#9ECE6A",
+                TimestampBracket = "#A8A8A8",
+                TimestampFaint = "#A8A8A8",
+                TimestampText = "#A8A8A8",
+                Url = "#A8A8A8",
+                Warning = "#E0AF68"
+            }
             for key, spec in Style.DefaultTheme :: any do
-                expect(spec.Dim == true).to.equal(key == "TimestampBracket" or key == "TimestampFaint")
+                expect(spec.Color).to.equal((palette :: any)[key])
+                expect(spec.Dim).to.equal(nil)
+                expect(spec.Opacity == 0.5).to.equal(key == "TimestampBracket" or key == "TimestampFaint")
+                if spec.Color then
+                    expect(string.match(Style.colorCode(spec.Color) :: string, "^38;2;") ~= nil).to.equal(true)
+                end
+            end
+        end)
+    end)
+
+    describe("Style.resolve", function()
+        it("should resolve every opacity and support combination without changing the input", function()
+            for _, supported in { false, true } do
+                for _, opacity in { 0, 0.25, 0.5, 1 } do
+                    const spec = table.freeze({ Bold = true, Color = "#A8A8A8", Opacity = opacity })
+                    const resolved = Style.resolve(spec, supported, "#5A5A5A")
+                    const repeated = Style.resolve(spec, supported, "#5A5A5A")
+                    expect(resolved.Color).to.equal(if supported or opacity == 1 then "#A8A8A8" else "#5A5A5A")
+                    expect(resolved.Opacity).to.equal(if supported and opacity ~= 1 then opacity else nil)
+                    expect(resolved.Bold).to.equal(true)
+                    expect(resolved.Dim).to.equal(nil)
+                    expect(Style.codes(resolved)).to.equal(Style.codes(repeated))
+                    expect(spec.Opacity).to.equal(opacity)
+                end
+            end
+        end)
+
+        it("should replace legacy dim with confirmed opacity or solid gray", function()
+            for _, supported in { false, true } do
+                for _, color in { "#A8A8A8", "gray", false } do
+                    const spec = { Bold = true, Color = if color then color else nil, Dim = true }
+                    const resolved = Style.resolve(spec, supported, "#5A5A5A")
+                    expect(resolved.Dim).to.equal(nil)
+                    expect(resolved.Bold).to.equal(true)
+                    expect(resolved.Opacity).to.equal(if supported and color == "#A8A8A8" then 0.5 else nil)
+                    expect(resolved.Color).to.equal(if supported and color == "#A8A8A8" then color else "#5A5A5A")
+                    expect(spec.Dim).to.equal(true)
+                end
+            end
+        end)
+
+        it("should leave opaque and ordinary styles untouched", function()
+            for _, spec in { {}, { Bold = true }, { Color = "green", Dim = false } } do
+                expect(Style.resolve(spec, false, "#5A5A5A")).to.equal(spec)
             end
         end)
     end)

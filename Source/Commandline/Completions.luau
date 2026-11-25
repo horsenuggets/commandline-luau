@@ -8,6 +8,7 @@ scripts that enable tab completion.
 
 --]]
 
+const Terminal = require("./Terminal")
 const t = require("@packages/t")
 
 type Command = {
@@ -190,14 +191,15 @@ const function zshDisplay(text: string): string
 end
 
 const function generateZshFlags(lines: { string }, command: Command, indent: string, rootName: string)
+    const terminal = Terminal.default()
     table.insert(lines, indent .. "local -a flag_names=() flag_shorts=() flag_long_displays=() flag_pair_displays=()")
     for _, flag in command._flags do
         const long = "--" .. flag.Name
         const short = if flag.Shorthand then "-" .. flag.Shorthand else ""
-        const description = "\27[90m-- \27[3m" .. flag.Description .. "\27[0m"
-        const longDisplay = "\27[94m" .. long .. "\27[0m " .. description
+        const description = `{terminal:Paint("Muted", "-- ")}{terminal:Paint("HelpDescription", flag.Description)}`
+        const longDisplay = `{terminal:Paint("HelpCommand", long)} {description}`
         const paired = if short ~= ""
-            then "\27[94m" .. short .. "\27[90m, \27[94m" .. long .. "\27[0m " .. description
+            then `{terminal:Paint("HelpCommand", short)}{terminal:Paint("Muted", ", ")}{longDisplay}`
             else longDisplay
         table.insert(lines, indent .. "flag_names+=(" .. zshDisplay(long) .. ")")
         table.insert(lines, indent .. "flag_shorts+=(" .. zshDisplay(short) .. ")")
@@ -220,6 +222,7 @@ const function generateZshFlags(lines: { string }, command: Command, indent: str
 end
 
 const function generateZshSubcommands(lines: { string }, command: Command, indent: string, rootName: string)
+    const terminal = Terminal.default()
     generateZshFlags(lines, command, indent, rootName)
     -- Hidden specs retain zsh's value parsing without its padded option display.
     table.insert(lines, indent .. 'local -a hidden_specs=( "${(@)^flag_specs/#/!}" )')
@@ -234,7 +237,10 @@ const function generateZshSubcommands(lines: { string }, command: Command, inden
     table.insert(lines, indent .. "    cmd)")
     table.insert(lines, indent .. "        local -a display_cmds cmd_names")
     for _, sub in command._subcommands do
-        const display = "\27[94m" .. sub.Name .. "\27[0m \27[90m-- \27[3m" .. sub.Description .. "\27[0m"
+        const display = `{terminal:Paint("HelpCommand", sub.Name)} {terminal:Paint("Muted", "-- ")}{terminal:Paint(
+            "HelpDescription",
+            sub.Description
+        )}`
         table.insert(lines, indent .. "        display_cmds+=(" .. zshDisplay(display) .. ")")
         table.insert(lines, indent .. "        cmd_names+=('" .. escapeShellString(sub.Name) .. "')")
     end
