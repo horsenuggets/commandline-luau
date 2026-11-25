@@ -15,6 +15,7 @@ const process = require("@lune/process")
 const Command = Commandline.Command
 const Completions = Commandline.Completions
 const Flag = Commandline.Flag
+const Terminal = Commandline.Terminal
 
 const function makeSimpleCommand(): any
     return Command.new({
@@ -132,7 +133,8 @@ const function completeZsh(command: any, input: string): string
 end
 
 const Testable = require("@devpackages/Testable")
-const describe, expect, it = Testable.describe, Testable.expect, Testable.it
+const afterEach, beforeEach, describe, expect, it =
+    Testable.afterEach, Testable.beforeEach, Testable.describe, Testable.expect, Testable.it
 
 return function()
     describe("generate", function()
@@ -209,12 +211,41 @@ return function()
     end)
 
     describe("zsh", function()
+        local previousTerminal = Terminal.default()
+        beforeEach(function()
+            previousTerminal = Terminal.default()
+            Terminal.setDefault(Terminal.new({ Color = true, Env = {} }))
+        end)
+        afterEach(function()
+            Terminal.setDefault(previousTerminal)
+        end)
+
+        it("should honor the current shared theme and NO_COLOR when generating displays", function()
+            const previous = Terminal.default()
+            const command = makeCommandWithSubcommands()
+            const ok, problem = pcall(function()
+                for _, noColor in { false, true } do
+                    Terminal.setDefault(Terminal.new({
+                        Env = if noColor then { NO_COLOR = "1" } else {},
+                        Theme = { HelpCommand = { Color = "#112233" } }
+                    }))
+                    const output = Completions.zsh(command)
+                    expect(string.find(output, "\\e[38;2;17;34;51", 1, true) ~= nil).to.equal(not noColor)
+                    expect(string.find(output, "\\e[", 1, true) ~= nil).to.equal(not noColor)
+                    expect(string.find(output, "\\e[94m", 1, true)).to.equal(nil)
+                    expect(string.find(output, "\\e[90m", 1, true)).to.equal(nil)
+                end
+            end)
+            Terminal.setDefault(previous)
+            assert(ok, tostring(problem))
+        end)
+
         it("should generate unpadded blue flag names and gray italic descriptions", function()
             const output = Completions.zsh(makeSimpleCommand())
             expect(
                 string.find(
                     output,
-                    "flag_long_displays+=($'\\e[94m--help\\e[0m \\e[90m-- \\e[3mShow help message.\\e[0m')",
+                    "flag_long_displays+=($'\\e[38;2;122;162;247m--help\\e[39m \\e[38;2;168;168;168m-- \\e[39m\\e[3;38;2;168;168;168mShow help message.\\e[23;39m')",
                     1,
                     true
                 )
@@ -222,7 +253,7 @@ return function()
             expect(
                 string.find(
                     output,
-                    "flag_pair_displays+=($'\\e[94m-h\\e[90m, \\e[94m--help\\e[0m \\e[90m-- \\e[3mShow help message.\\e[0m')",
+                    "flag_pair_displays+=($'\\e[38;2;122;162;247m-h\\e[39m\\e[38;2;168;168;168m, \\e[39m\\e[38;2;122;162;247m--help\\e[39m \\e[38;2;168;168;168m-- \\e[39m\\e[3;38;2;168;168;168mShow help message.\\e[23;39m')",
                     1,
                     true
                 )
@@ -252,6 +283,24 @@ return function()
 
         const available, probe = pcall(process.exec, "zsh", { "-f", "-c", "zmodload zsh/zpty" })
         const shellTest = if available and probe.ok then it else Testable.itSKIP
+        if process.os ~= "windows" then
+            for _, noColor in { false, true } do
+                shellTest(`should show themed help in the isolated demo with NO_COLOR set to {noColor}`, function()
+                    const result = process.exec(`{tostring(project)}/Scripts/ZshCompletionDemo.exec.luau`, {}, {
+                        env = { NO_COLOR = if noColor then "1" else "" },
+                        stdio = { stdin = "ae --help\nexit\n" }
+                    })
+                    const output = `{result.stdout}{result.stderr}`
+                    assert(result.ok, output)
+                    const plain = Commandline.Style.strip(output)
+                    expect(string.find(plain, "Manage an example application.", 1, true)).to.be.ok()
+                    expect(string.find(plain, "[Usage]", 1, true)).to.be.ok()
+                    expect(string.find(plain, "Completion demo", 1, true)).to.be.ok()
+                    expect(string.find(output, "\u{1b}[38;2;", 1, true) ~= nil).to.equal(not noColor)
+                    expect(string.find(output, "\u{1b}[38;5;", 1, true)).to.equal(nil)
+                end)
+            end
+        end
         for _, case in
             {
                 { Input = "mytool ", Inserted = "mytool ", Matches = 3 },
@@ -340,9 +389,9 @@ return function()
         it("should include subcommand descriptions", function()
             const cmd = makeCommandWithSubcommands()
             const output = Completions.zsh(cmd)
-            expect(string.find(output, "-- \\e[3mBuild the project.", 1, true)).to.be.ok()
-            expect(string.find(output, "-- \\e[3mRun the project.", 1, true)).to.be.ok()
-            expect(string.find(output, "-- \\e[3mInitialize a new project.", 1, true)).to.be.ok()
+            expect(string.find(output, "-- \\e[39m\\e[3;38;2;168;168;168mBuild the project.", 1, true)).to.be.ok()
+            expect(string.find(output, "-- \\e[39m\\e[3;38;2;168;168;168mRun the project.", 1, true)).to.be.ok()
+            expect(string.find(output, "-- \\e[39m\\e[3;38;2;168;168;168mInitialize a new project.", 1, true)).to.be.ok()
         end)
 
         it("should display subcommands without a leading marker", function()
@@ -350,7 +399,7 @@ return function()
             expect(
                 string.find(
                     output,
-                    "display_cmds+=($'\\e[94mbuild\\e[0m \\e[90m-- \\e[3mBuild the project.\\e[0m')",
+                    "display_cmds+=($'\\e[38;2;122;162;247mbuild\\e[39m \\e[38;2;168;168;168m-- \\e[39m\\e[3;38;2;168;168;168mBuild the project.\\e[23;39m')",
                     1,
                     true
                 )

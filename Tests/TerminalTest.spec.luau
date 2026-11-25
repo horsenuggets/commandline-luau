@@ -12,6 +12,7 @@ const Style = require("../Source/Commandline/Terminal/Style")
 const Terminal = require("../Source/Commandline/Terminal")
 const fs = require("@lune/fs")
 const process = require("@lune/process")
+const stdio = require("@lune/stdio")
 
 const Testable = require("@devpackages/Testable")
 const describe, expect, it = Testable.describe, Testable.expect, Testable.it
@@ -153,6 +154,229 @@ return function()
         end)
     end)
 
+    describe("Terminal capabilities", function()
+        it("should render colored timestamps through the actual native capability API", function()
+            const terminal = Terminal.new({ Color = true, Columns = 0, Env = {}, Timestamps = "stopwatch" })
+            expect(type(terminal:Prefix())).to.equal("string")
+            expect(terminal:Capabilities().ForegroundOpacity).to.equal(
+                (stdio :: any).terminalCapabilities().ForegroundOpacity
+            )
+        end)
+
+        it("should detect lazily once and apply the result to every opacity-bearing role", function()
+            for _, supported in { false, true } do
+                local calls = 0
+                const terminal = harness({
+                    Color = true,
+                    DetectCapabilities = function()
+                        calls += 1
+                        return { ForegroundOpacity = supported }
+                    end,
+                    Timestamps = "stopwatch"
+                }).Terminal
+                terminal:Heading("Heading.")
+                expect(calls).to.equal(0)
+                for key, spec in terminal.Theme :: any do
+                    const resolved = Style.resolve(spec, supported, "#5A5A5A")
+                    expect(terminal:Paint(key, "text")).to.equal(Style.paint(resolved, "text", true))
+                end
+                for _ = 1, 3 do
+                    const prefix = terminal:Prefix()
+                    expect(string.find(prefix, "38:6::168:168:168:128", 1, true) ~= nil).to.equal(supported)
+                    expect(string.find(prefix, "38;2;90;90;90", 1, true) ~= nil).to.equal(not supported)
+                    expect(string.find(prefix, "\u{1b}[2m", 1, true)).to.equal(nil)
+                end
+                expect(calls).to.equal(1)
+            end
+        end)
+
+        it("should never probe disabled colors or fully opaque output", function()
+            const function unexpectedProbe(): Terminal.Capabilities
+                error("This output must not probe the terminal.")
+            end
+            for _, config in
+                {
+                    { Color = false },
+                    { Env = { NO_COLOR = "1" } }
+                }
+            do
+                config.DetectCapabilities = unexpectedProbe
+                const terminal = harness(config).Terminal
+                expect(terminal:Paint("TimestampFaint", "0")).to.equal("0")
+            end
+            const terminal = harness({
+                Color = true,
+                DetectCapabilities = unexpectedProbe,
+                Theme = { TimestampFaint = { Color = "#A8A8A8", Opacity = 1 } }
+            }).Terminal
+            expect(terminal:Paint("TimestampFaint", "0")).to.equal("\u{1b}[38;2;168;168;168m0\u{1b}[39m")
+            terminal:Heading("Heading.")
+        end)
+
+        it("should use solid gray for custom sinks without native detection", function()
+            for _, sink in { "Write", "WriteError" } do
+                const options: Terminal.Config = { Color = true }
+                (options :: any)[sink] = function() end
+                const terminal = Terminal.new(options)
+                expect(terminal:Paint("TimestampFaint", "0")).to.equal("\u{1b}[38;2;90;90;90m0\u{1b}[39m")
+                expect(terminal._foregroundOpacity).to.equal(false)
+            end
+        end)
+
+        it("should let buffered renderers inherit the parent capability decision", function()
+            for _, supported in { false, true } do
+                const parent = harness({
+                    Color = true,
+                    DetectCapabilities = function()
+                        return { ForegroundOpacity = supported }
+                    end
+                }).Terminal
+                const child = harness({
+                    Color = true,
+                    DetectCapabilities = function()
+                        return parent:Capabilities()
+                    end
+                }).Terminal
+                expect(child:Paint("TimestampFaint", "0")).to.equal(parent:Paint("TimestampFaint", "0"))
+                const capabilities = parent:Capabilities()
+                capabilities.ForegroundOpacity = not supported
+                expect(parent:Capabilities().ForegroundOpacity).to.equal(supported)
+            end
+            const disabled = harness({
+                Color = false,
+                DetectCapabilities = function()
+                    error("Disabled colors must not query terminal capabilities.")
+                end
+            }).Terminal
+            expect(disabled:Capabilities().ForegroundOpacity).to.equal(false)
+        end)
+
+        it("should resolve custom opacity for paths, helpers, and nested styles", function()
+            for _, supported in { false, true } do
+                const terminal = harness({
+                    Color = true,
+                    DetectCapabilities = function()
+                        return { ForegroundOpacity = supported }
+                    end,
+                    Theme = {
+                        Path = { Color = "#A8A8A8", Opacity = 0.25 },
+                        RobloxPath = { Bold = true, Color = "#A8A8A8", Opacity = 0.25 },
+                        Warning = { Color = "#A8A8A8", Opacity = 0.25 }
+                    }
+                }).Terminal
+                const expected = if supported then "38:6::168:168:168:64" else "38;2;90;90;90"
+                for _, value in
+                    {
+                        terminal:Path("a b.txt"),
+                        terminal:Path("a b.rbxl"),
+                        terminal:RobloxPath("Workspace.My Model"),
+                        terminal:Warning(terminal:RobloxPath("Workspace.My Model"))
+                    }
+                do
+                    expect(string.find(value, expected, 1, true) ~= nil).to.equal(true)
+                    expect(string.find(value, "38:6", 1, true) ~= nil).to.equal(supported)
+                end
+            end
+        end)
+
+        it("should resolve legacy dim without emitting ANSI faint or requiring a Faint override color", function()
+            const terminal = harness({
+                Color = true,
+                Theme = { Faint = { Bold = true }, Path = { Color = "gray", Dim = true } }
+            }).Terminal
+            expect(terminal:Path("a b")).to.equal("\u{1b}[38;2;90;90;90ma\u{1b}[22;38;2;90;90;90m·b\u{1b}[39m")
+        end)
+    end)
+
+    describe("Terminal prompts", function()
+        it("should accept every named theme foreground at the real native parser", function()
+            -- Native palette validation precedes the required confirm message. This
+            -- sentinel exercises real color parsing without opening an input prompt.
+            const invalidOk, invalidProblem = pcall((stdio :: any).prompt, "confirm", nil, true, {
+                Accent = "unknown",
+                Color = false,
+                Error = "",
+                Muted = "",
+                Success = "",
+                Text = "",
+                Warning = ""
+            })
+            expect(invalidOk).to.equal(false)
+            expect(string.find(tostring(invalidProblem), 'Prompt color field "Accent"', 1, true)).to.be.ok()
+            for _, role in { "Error", "HelpArgument", "Muted", "RobloxPath", "Success", "Warning" } do
+                for _, name in
+                    {
+                        "black",
+                        "blackBright",
+                        "blue",
+                        "blueBright",
+                        "cyan",
+                        "cyanBright",
+                        "gray",
+                        "green",
+                        "greenBright",
+                        "magenta",
+                        "magentaBright",
+                        "red",
+                        "redBright",
+                        "white",
+                        "whiteBright",
+                        "yellow",
+                        "yellowBright"
+                    }
+                do
+                    for _, color in { false, true } do
+                        const terminal = harness({ Color = color, Theme = { [role] = { Color = name } } }).Terminal
+                        const ok, problem = pcall(function()
+                            terminal:Prompt("confirm", nil, true)
+                        end)
+                        expect(ok).to.equal(false)
+                        expect(string.find(tostring(problem), "Argument #2 missing or nil", 1, true)).to.be.ok()
+                    end
+                end
+            end
+        end)
+
+        it("should pass each prompt kind, its default, and the current RGB theme to the native boundary", function()
+            const cases: { [string]: { Default: Terminal.PromptDefault?, Result: Terminal.PromptResult } } = {
+                confirm = { Default = true, Result = false },
+                multiselect = { Default = { "First", "Second" }, Result = { 1, 2 } },
+                password = { Result = "secret" },
+                select = { Default = { "First", "Second" }, Result = 2 },
+                text = { Default = "initial", Result = "answer" }
+            }
+            for _, color in { false, true } do
+                const terminal = harness({
+                    Color = color,
+                    Prompt = function(kind, text, defaultValue, colors)
+                        const case = cases[kind]
+                        expect(text).to.equal("Question?")
+                        expect(defaultValue).to.equal(case.Default)
+                        expect(colors.Accent).to.equal("#010203")
+                        expect(colors.Color).to.equal(color)
+                        expect(colors.Error).to.equal("#040506")
+                        expect(colors.Muted).to.equal("#070809")
+                        expect(colors.Success).to.equal("#0A0B0C")
+                        expect(colors.Text).to.equal("#0D0E0F")
+                        expect(colors.Warning).to.equal("#101112")
+                        return case.Result
+                    end,
+                    Theme = {
+                        Error = { Color = "#040506" },
+                        HelpArgument = { Color = "#0D0E0F" },
+                        Muted = { Color = "#070809" },
+                        RobloxPath = { Color = "#010203" },
+                        Success = { Color = "#0A0B0C" },
+                        Warning = { Color = "#101112" }
+                    }
+                }).Terminal
+                for kind, case in cases do
+                    expect(terminal:Prompt(kind, "Question?", case.Default)).to.equal(case.Result)
+                end
+            end
+        end)
+    end)
+
     describe("Terminal helpers", function()
         it("should style paths by kind and normalize them", function()
             const terminal = harness({ Color = false, Home = "C:\\Users\\user" }).Terminal
@@ -236,7 +460,7 @@ return function()
             const output = table.concat(h.Output)
             for _, word in { "One", "Two" } do
                 const position = assert(string.find(output, word, 1, true))
-                expect(Style.sgrState("", string.sub(output, 1, position - 1))).to.equal("\u{1b}[33m")
+                expect(Style.sgrState("", string.sub(output, 1, position - 1))).to.equal("\u{1b}[38;2;224;175;104m")
             end
         end)
 
@@ -374,6 +598,9 @@ return function()
                 const h = harness({
                     Color = color,
                     Columns = 25,
+                    DetectCapabilities = function()
+                        return { ForegroundOpacity = true }
+                    end,
                     Theme = {
                         TimestampBracket = { Color = "#a8a8a8", Opacity = 0.25 },
                         TimestampFaint = { Color = "#a8a8a8", Opacity = 0.25 }
@@ -400,12 +627,14 @@ return function()
             const h = harness({ Color = true, Timestamps = "stopwatch" })
             h.Advance(12.345)
             const theme = h.Terminal.Theme
+            const bracket = Style.resolve(theme.TimestampBracket, false, "#5A5A5A")
+            const faint = Style.resolve(theme.TimestampFaint, false, "#5A5A5A")
             expect(h.Terminal:Prefix()).to.equal(
-                `{Style.paint(theme.TimestampBracket, "[", true)}{Style.paint(theme.TimestampFaint, "00:", true)}{Style.paint(
+                `{Style.paint(bracket, "[", true)}{Style.paint(faint, "00:", true)}{Style.paint(
                     theme.TimestampText,
                     "12.345",
                     true
-                )}{Style.paint(theme.TimestampBracket, "]", true)} `
+                )}{Style.paint(bracket, "]", true)} `
             )
         end)
     end)

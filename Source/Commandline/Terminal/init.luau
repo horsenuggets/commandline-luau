@@ -28,18 +28,43 @@ const WINDOWS_COLUMNS_SCRIPT =
 
 const TIMESTAMPS_VARIABLE = "COMMANDLINE_TIMESTAMPS"
 
+export type Capabilities = {
+    ForegroundOpacity: boolean
+}
+
 export type Clock = {
     Elapsed: () -> number,
     LocalOffsetMinutes: (unixMillis: number) -> number,
     UnixMillis: () -> number
 }
 
+export type PromptColors = {
+    Accent: string,
+    Color: boolean,
+    Error: string,
+    Muted: string,
+    Success: string,
+    Text: string,
+    Warning: string
+}
+
+export type PromptDefault = boolean | string | { string }
+export type PromptResult = boolean | string | number | { number } | nil
+export type PromptHandler = (
+    kind: string,
+    text: string?,
+    defaultValue: PromptDefault?,
+    colors: PromptColors
+) -> PromptResult
+
 export type Config = {
     Clock: Clock?,
     Color: boolean?,
     Columns: number?,
+    DetectCapabilities: (() -> Capabilities)?,
     Env: { [string]: string? }?,
     Home: string?,
+    Prompt: PromptHandler?,
     Theme: Style.ThemeOverrides?,
     Timestamps: (Timestamp.Config | string)?,
     Write: ((string) -> ())?,
@@ -70,6 +95,7 @@ export type Terminal = {
     detectColumns: (os: string) -> number?,
     localOffsetMinutes: (unixMillis: number) -> number,
     Address: (self: Terminal, address: string) -> string,
+    Capabilities: (self: Terminal) -> Capabilities,
     Color: boolean,
     Columns: (self: Terminal) -> number,
     Count: (self: Terminal, count: number | string) -> string,
@@ -82,6 +108,7 @@ export type Terminal = {
     Prefix: (self: Terminal) -> string,
     Print: (self: Terminal, text: string?, options: PrintOptions?) -> (),
     PrintError: (self: Terminal, text: string?, options: PrintOptions?) -> (),
+    Prompt: (self: Terminal, kind: string, text: string?, defaultValue: PromptDefault?) -> PromptResult,
     RobloxPath: (self: Terminal, path: string) -> string,
     Step: (self: Terminal, index: number, total: number, text: string) -> string,
     Stream: (self: Terminal, target: Target?) -> Stream,
@@ -92,6 +119,9 @@ export type Terminal = {
     Warning: (self: Terminal, text: string) -> string,
     _clock: Clock,
     _columns: number?,
+    _detectCapabilities: () -> Capabilities,
+    _foregroundOpacity: boolean?,
+    _prompt: PromptHandler,
     _write: { [Target]: (string) -> () }
 }
 
@@ -103,8 +133,10 @@ const configCheck = t.optional(t.strictInterface({
     })),
     Color = t.optional(t.boolean),
     Columns = t.optional(t.numberMin(0)),
+    DetectCapabilities = t.optional(t.callback),
     Env = t.optional(t.table),
     Home = t.optional(t.string),
+    Prompt = t.optional(t.callback),
     Theme = t.optional(t.table),
     Timestamps = t.optional(t.union(t.string, t.table)),
     Write = t.optional(t.callback),
@@ -115,6 +147,28 @@ const Terminal = {}
 Terminal.__index = Terminal
 
 local defaultTerminal: Terminal? = nil
+
+const function detectCapabilities(): Capabilities
+    return (stdio :: any).terminalCapabilities()
+end
+
+const function noCapabilities(): Capabilities
+    return { ForegroundOpacity = false }
+end
+
+const function prompt(kind: string, text: string?, defaultValue: PromptDefault?, colors: PromptColors): PromptResult
+    return (stdio :: any).prompt(kind, text, defaultValue, colors)
+end
+
+const function effectiveSpec(self: Terminal, key: string): Style.Spec
+    const spec = (self.Theme :: any)[key]
+    assert(spec, `Unknown theme key "{key}".`)
+    if not self.Color or (spec.Opacity == nil and not spec.Dim) then
+        return spec
+    end
+    const foregroundOpacity = spec.Opacity ~= 1 and self:Capabilities().ForegroundOpacity
+    return Style.resolve(spec, foregroundOpacity, (self.Theme.Faint.Color or Style.DefaultTheme.Faint.Color) :: string)
+end
 
 function Terminal.localOffsetMinutes(unixMillis: number): number
     assert(t.number(unixMillis))
@@ -163,8 +217,11 @@ end
     > Color - Whether to emit ANSI styles (on unless NO_COLOR is set)
     > Columns - Width to wrap lines at, or 0 to never wrap (the window width when writing
     >   to a terminal window, otherwise 0)
+    > DetectCapabilities - Lazy capability provider (native terminal detection, or no
+    >   capabilities for custom output sinks)
     > Env - Environment variables to read (the process environment)
     > Home - The home folder that paths collapse to "~" (the OS home folder)
+    > Prompt - Interactive prompt handler (stdio.prompt)
     > Theme - Style overrides keyed by theme entry (the default theme)
     > Timestamps - A timestamp config or setting such as "stopwatch" (disabled)
     > Write, WriteError - Output sinks (standard output and standard error)
@@ -183,6 +240,10 @@ function Terminal.new(config: Config?): Terminal
         _clock = options.Clock or systemClock(),
         -- Custom sinks are not a terminal window, so they only wrap when asked to.
         _columns = options.Columns or if options.Write or options.WriteError then 0 else nil,
+        _detectCapabilities = options.DetectCapabilities
+            or if options.Write or options.WriteError then noCapabilities else detectCapabilities,
+        _foregroundOpacity = nil,
+        _prompt = options.Prompt or prompt,
         _write = {
             Error = options.WriteError or stdio.ewrite,
             Output = options.Write or stdio.write
@@ -209,13 +270,24 @@ function Terminal.Paint(self: Terminal, key: string, text: string): string
     assert(t.string(key))
     assert(t.string(text))
 
-    const spec = (self.Theme :: any)[key]
-    assert(spec, `Unknown theme key "{key}".`)
-    return Style.paint(spec, text, self.Color)
+    return Style.paint(effectiveSpec(self, key), text, self.Color)
 end
 
 function Terminal.Address(self: Terminal, address: string): string
     return self:Paint("Address", address)
+end
+
+-- Child renderers can inherit capability decisions without probing their output sinks.
+function Terminal.Capabilities(self: Terminal): Capabilities
+    if not self.Color then
+        return { ForegroundOpacity = false }
+    end
+    if self._foregroundOpacity == nil then
+        const capabilities = self._detectCapabilities()
+        assert(t.strictInterface({ ForegroundOpacity = t.boolean })(capabilities))
+        self._foregroundOpacity = capabilities.ForegroundOpacity
+    end
+    return { ForegroundOpacity = self._foregroundOpacity == true }
 end
 
 function Terminal.Count(self: Terminal, count: number | string): string
@@ -251,13 +323,30 @@ function Terminal.Path(self: Terminal, path: string, options: PathOptions?): str
     const home = if options ~= nil and options.Home ~= nil then options.Home else self.Home
     const display = Path.display(path, home, directory)
     const key = if not directory and Path.isRobloxFile(display) then "RobloxPath" else "Path"
-    return Style.paintPath((self.Theme :: any)[key], display, self.Color)
+    return Style.paintPath(effectiveSpec(self, key), display, self.Color)
+end
+
+-- Native prompts take their colors from the same theme as rendered terminal messages.
+function Terminal.Prompt(self: Terminal, kind: string, text: string?, defaultValue: PromptDefault?): PromptResult
+    assert(t.literal("confirm", "multiselect", "password", "select", "text")(kind))
+    assert(t.optional(t.string)(text))
+    assert(t.optional(t.union(t.boolean, t.string, t.array(t.string)))(defaultValue))
+
+    return self._prompt(kind, text, defaultValue, {
+        Accent = self.Theme.RobloxPath.Color or "",
+        Color = self.Color,
+        Error = self.Theme.Error.Color or "",
+        Muted = self.Theme.Muted.Color or "",
+        Success = self.Theme.Success.Color or "",
+        Text = self.Theme.HelpArgument.Color or "",
+        Warning = self.Theme.Warning.Color or ""
+    })
 end
 
 -- Paints a Roblox path, such as a place file name or an instance path.
 function Terminal.RobloxPath(self: Terminal, path: string): string
     assert(t.string(path))
-    return Style.paintPath(self.Theme.RobloxPath, Path.display(path, self.Home), self.Color)
+    return Style.paintPath(effectiveSpec(self, "RobloxPath"), Path.display(path, self.Home), self.Color)
 end
 
 -- Formats a numbered step such as "[1/5] Text", highlighting the current step number.
@@ -298,12 +387,10 @@ function Terminal.Prefix(self: Terminal): string
     if faint == nil or text == nil then
         return ""
     end
-    const bracket = self.Theme.TimestampBracket
-    return `{Style.paint(bracket, "[", self.Color)}{Style.paint(self.Theme.TimestampFaint, faint, self.Color)}{Style.paint(
-        self.Theme.TimestampText,
-        text,
-        self.Color
-    )}{Style.paint(bracket, "]", self.Color)} `
+    return `{self:Paint("TimestampBracket", "[")}{self:Paint("TimestampFaint", faint)}{self:Paint("TimestampText", text)}{self:Paint(
+        "TimestampBracket",
+        "]"
+    )} `
 end
 
 --[[

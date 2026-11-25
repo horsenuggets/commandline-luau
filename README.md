@@ -2,6 +2,16 @@
 
 A CLI builder for Luau.
 
+## Runtime Requirements
+
+Use the maintained Lune fork selected by `rokit.toml`. Consumers must select a runtime
+that provides `stdio.terminalCapabilities()` and semantic prompt foregrounds, including
+named and bright color support. Wally installs the Luau package, not its native runtime.
+
+Unconfirmed terminal opacity falls back to RGB gray. A missing native API indicates an
+unsupported runtime, not an unsupported terminal; it is not silently treated as a
+negative capability result.
+
 ## Basic Usage
 
 ```luau

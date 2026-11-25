@@ -10,10 +10,8 @@ but not both.
 --]]
 
 const Arg = require("./Arg")
-const Chalk = require("@packages/Chalk")
 const Flag = require("./Flag")
 const StringUtils = require("./Helpers/StringUtils")
-const Style = require("./Terminal/Style")
 const Terminal = require("./Terminal")
 const TypeUtils = require("./Helpers/TypeUtils")
 const t = require("@packages/t")
@@ -31,7 +29,6 @@ export type Command = {
     _args: { Arg.Arg },
     _commandPath: string,
     _flags: { Flag.Flag },
-    _helpMessage: string,
     _impl: ((args: { [string]: any }, flags: { [string]: { Value: any? } }) -> any)?,
     _subcommands: { Command },
 
@@ -78,7 +75,6 @@ const ICommandlineOptions = t.strictInterface({
     Subcommands = t.optional(t.array(t.any)),
     Impl = t.optional(t.callback)
 })
-const HELP_GRAY = Chalk.hex(Style.DefaultTheme.Muted.Color :: string)
 const ITokens = t.array(t.string)
 
 const Command = {}
@@ -217,53 +213,55 @@ function Command.new(commandlineOptions: CommandlineOptions): Command
     table.freeze(self._flags :: any)
     table.freeze(self._subcommands :: any)
 
-    self:_makeHelpMessage()
     return self
 end
 
 function Command._makeHelpMessage(self: Command): string
+    const terminal = Terminal.default()
     -- Build the usage line with Flags and Args
-    const usageParts = { Chalk.blueBright(self._commandPath) }
+    const usageParts = { terminal:Paint("HelpCommand", self._commandPath) }
 
     -- If subcommands are present, show <subcommand> instead of Args
     if #self._subcommands > 0 then
-        table.insert(usageParts, `<{Chalk.white(`subcommand`)}>`)
+        table.insert(usageParts, `<{terminal:Paint("HelpArgument", `subcommand`)}>`)
     else
         -- Add Flags annotation if Flags are present
         if #self._flags > 0 then
-            table.insert(usageParts, `[{Chalk.white(`flags...`)}]`)
+            table.insert(usageParts, `[{terminal:Paint("HelpArgument", `flags...`)}]`)
         end
 
         -- Add Args (required as <Arg>, optional as [Arg])
         for _, arg in self._args do
             if arg.Required then
-                table.insert(usageParts, `<{Chalk.white(arg.Name)}>`)
+                table.insert(usageParts, `<{terminal:Paint("HelpArgument", arg.Name)}>`)
             else
-                table.insert(usageParts, `[{Chalk.white(arg.Name)}]`)
+                table.insert(usageParts, `[{terminal:Paint("HelpArgument", arg.Name)}]`)
             end
         end
     end
 
-    const usageLine = `{HELP_GRAY(`> {table.concat(usageParts, " ")}`)}`
+    const usageLine = `{terminal:Paint("Muted", `> {table.concat(usageParts, " ")}`)}`
 
     const messageParts = {
-        `{Chalk.italic(HELP_GRAY(`{self.Description}`))}`,
+        terminal:Paint("HelpDescription", self.Description),
         ``,
-        `{HELP_GRAY(`[{Chalk.yellow(`Usage`)}]`)}`,
+        `{terminal:Paint("Muted", `[{terminal:Paint("HelpHeading", `Usage`)}]`)}`,
         usageLine
     }
     if self._commandPath == self.Name then
         table.insert(
             messageParts,
             1,
-            `{Chalk.bold(self.Name)}{if self.Version then ` {HELP_GRAY(`[{Chalk.greenBright(self.Version)}]`)}` else ``}`
+            `{terminal:Paint("Emphasis", self.Name)}{if self.Version
+                then ` {terminal:Paint("Muted", `[{terminal:Paint("HelpVersion", self.Version)}]`)}`
+                else ``}`
         )
     end
 
     -- Add Flags section if present
     if #self._flags > 0 then
         table.insert(messageParts, ``)
-        table.insert(messageParts, `{HELP_GRAY(`[{Chalk.yellow(`Flags`)}]`)}`)
+        table.insert(messageParts, `{terminal:Paint("Muted", `[{terminal:Paint("HelpHeading", `Flags`)}]`)}`)
 
         -- Sort flags alphabetically, keeping help and version last
         const AUTO_FLAGS = { help = true, version = true }
@@ -282,17 +280,18 @@ function Command._makeHelpMessage(self: Command): string
 
             -- Add shorthand if available
             if flag.Shorthand then
-                table.insert(flagParts, Chalk.blueBright(`-{flag.Shorthand}`))
+                table.insert(flagParts, terminal:Paint("HelpCommand", `-{flag.Shorthand}`))
             end
 
             -- Add full Flag name
-            table.insert(flagParts, Chalk.blueBright(`--{flag.Name}`))
+            table.insert(flagParts, terminal:Paint("HelpCommand", `--{flag.Name}`))
 
             -- Build the Flag line
             const flagLine =
-                `{HELP_GRAY(`> `)}{table.concat(flagParts, HELP_GRAY(", "))} {HELP_GRAY("--")} {Chalk.italic(
-                    HELP_GRAY(flag.Description)
-                )}`
+                `{terminal:Paint("Muted", `> `)}{table.concat(flagParts, terminal:Paint("Muted", ", "))} {terminal:Paint(
+                    "Muted",
+                    "--"
+                )} {terminal:Paint("HelpDescription", flag.Description)}`
             table.insert(messageParts, flagLine)
         end
     end
@@ -300,22 +299,22 @@ function Command._makeHelpMessage(self: Command): string
     -- Add subcommands section if present
     if #self._subcommands > 0 then
         table.insert(messageParts, ``)
-        table.insert(messageParts, `{HELP_GRAY(`[{Chalk.yellow(`Subcommands`)}]`)}`)
+        table.insert(messageParts, `{terminal:Paint("Muted", `[{terminal:Paint("HelpHeading", `Subcommands`)}]`)}`)
         const sortedSubcommands = table.clone(self._subcommands)
         table.sort(sortedSubcommands, function(a, b)
             return a.Name < b.Name
         end)
         for _, subcommand in sortedSubcommands do
             const subcommandLine =
-                `{HELP_GRAY(`> `)}{Chalk.blueBright(subcommand.Name)} {HELP_GRAY("--")} {Chalk.italic(
-                    HELP_GRAY(subcommand.Description)
-                )}`
+                `{terminal:Paint("Muted", `> `)}{terminal:Paint("HelpCommand", subcommand.Name)} {terminal:Paint(
+                    "Muted",
+                    "--"
+                )} {terminal:Paint("HelpDescription", subcommand.Description)}`
             table.insert(messageParts, subcommandLine)
         end
     end
 
-    self._helpMessage = table.concat(messageParts, "\n")
-    return self._helpMessage
+    return table.concat(messageParts, "\n")
 end
 
 function Command._setCommandPath(self: Command, path: string)
@@ -323,15 +322,15 @@ function Command._setCommandPath(self: Command, path: string)
     for _, subcommand in self._subcommands do
         subcommand:_setCommandPath(`{path} {subcommand.Name}`)
     end
-    self:_makeHelpMessage()
 end
 
 function Command.ShowHelp(self: Command)
-    Terminal.default():Print(self._helpMessage, { Timestamps = false, Wrap = false })
+    Terminal.default():Print(self:_makeHelpMessage(), { Timestamps = false, Wrap = false })
 end
 
 function Command._printError(self: Command, message: string)
-    Terminal.default():PrintError(`{Chalk.red(message)}\n`)
+    const terminal = Terminal.default()
+    terminal:PrintError(`{terminal:Error(message)}\n`)
 end
 
 function Command._findFlagByName(self: Command, name: string): Flag.Flag?
@@ -364,25 +363,25 @@ function Command._parseFlag(
 
     if isShorthand then
         if #token ~= 2 or token:sub(1, 1) ~= "-" then
-            return nil, `Invalid shorthand flag format {Chalk.bold(token)}.`
+            return nil, `Invalid shorthand flag format {Terminal.default():Paint("Emphasis", token)}.`
         end
 
         const shorthand = token:sub(2, 2)
         flagDef = self:_findFlagByShorthand(shorthand)
 
         if not flagDef then
-            return nil, `Unknown flag {Chalk.bold(`-{shorthand}`)}.`
+            return nil, `Unknown flag {Terminal.default():Paint("Emphasis", `-{shorthand}`)}.`
         end
     else
         if #token <= 2 or token:sub(1, 2) ~= "--" then
-            return nil, `Invalid shorthand flag format {Chalk.bold(token)}.`
+            return nil, `Invalid shorthand flag format {Terminal.default():Paint("Emphasis", token)}.`
         end
 
         const flagName = token:sub(3)
         flagDef = self:_findFlagByName(flagName)
 
         if not flagDef then
-            return nil, `Unknown flag {Chalk.bold(`--{flagName}`)}.`
+            return nil, `Unknown flag {Terminal.default():Paint("Emphasis", `--{flagName}`)}.`
         end
     end
 
@@ -396,7 +395,7 @@ function Command._parseFlag(
     index += 1
     if index > #tokens then
         const flagDisplay = isShorthand and `-{token:sub(2, 2)}` or `--{flagDef.Name}`
-        return nil, `flag {Chalk.bold(flagDisplay)} requires a value.`
+        return nil, `flag {Terminal.default():Paint("Emphasis", flagDisplay)} requires a value.`
     end
     const flagValueToken = tokens[index]
 
@@ -404,7 +403,7 @@ function Command._parseFlag(
     const flagValue, castErr = TypeUtils.castFromString(flagValueToken, flagDef.Type)
     if castErr then
         const flagDisplay = isShorthand and `-{token:sub(2, 2)}` or `--{flagDef.Name}`
-        return nil, `flag {Chalk.bold(flagDisplay)} - {castErr}`
+        return nil, `flag {Terminal.default():Paint("Emphasis", flagDisplay)} - {castErr}`
     end
 
     parsedFlags[flagDef.Name] = { Value = flagValue }
@@ -445,7 +444,7 @@ function Command._parsePositionalArgs(self: Command, positionalArgs: { string })
             -- Cast the Arg value to the correct type
             const argValue, castErr = TypeUtils.castFromString(positionalArgs[argIndex], argDef.Type)
             if castErr then
-                return nil, `Arg {Chalk.bold(argDef.Name)} - {castErr}`
+                return nil, `Arg {Terminal.default():Paint("Emphasis", argDef.Name)} - {castErr}`
             end
             parsedArgs[argDef.Name] = argValue
         elseif argDef.Default ~= nil then
@@ -542,7 +541,7 @@ function Command.Execute(self: Command, tokens: { string }): any
             self:ShowHelp()
             return
         else
-            self:_printError(`Unknown subcommand {Chalk.bold(positionalArgs[1])}.`)
+            self:_printError(`Unknown subcommand {Terminal.default():Paint("Emphasis", positionalArgs[1])}.`)
             self:ShowHelp()
             return
         end

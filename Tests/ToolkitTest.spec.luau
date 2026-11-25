@@ -8,7 +8,6 @@ Install/update tests mock all filesystem, network, process, and binary replaceme
 
 --]]
 
-const Chalk = require("@packages/Chalk")
 const fs = require("@lune/fs")
 const luau = require("@lune/luau")
 const process = require("@lune/process")
@@ -45,7 +44,6 @@ const function runProgress(commandName: string, terminal: Terminal.Terminal, sce
     local exitCode: number? = nil
     const exited = {}
     const dependencies: { [string]: any } = {
-        ["@packages/Chalk"] = Chalk,
         ["@packages/t"] = t,
         ["@lune/fs"] = {
             isDir = function()
@@ -222,6 +220,83 @@ end
 
 return function()
     describe("generateVersion", function()
+        it("should theme version progress and missing-file errors through the shared terminal", function()
+            for _, color in { false, true } do
+                for _, missing in { false, true } do
+                    const output = {}
+                    const errors = {}
+                    const terminal = Terminal.new({
+                        Color = color,
+                        Env = {},
+                        Write = function(text)
+                            table.insert(output, text)
+                        end,
+                        WriteError = function(text)
+                            table.insert(errors, text)
+                        end
+                    })
+                    const exited = {}
+                    const dependencies: { [string]: any } = {
+                        ["@lune/fs"] = {
+                            isDir = function()
+                                return true
+                            end,
+                            isFile = function()
+                                return not missing
+                            end,
+                            readFile = function()
+                                return "1.2.3\n"
+                            end,
+                            writeFile = function() end
+                        },
+                        ["@lune/process"] = {
+                            exit = function(code)
+                                expect(code).to.equal(1)
+                                error(exited, 0)
+                            end
+                        },
+                        ["@packages/t"] = t,
+                        ["@self/Completions"] = {},
+                        ["@self/SelfUpdate"] = {},
+                        ["@self/Terminal"] = {
+                            default = function()
+                                return terminal
+                            end
+                        }
+                    }
+                    const toolkit = luau.load(TOOLKIT_SOURCE, {
+                        environment = {
+                            print = function()
+                                error("Version progress bypassed the shared terminal.")
+                            end,
+                            require = function(path)
+                                return assert(dependencies[path], `Unexpected dependency "{path}".`)
+                            end
+                        }
+                    })()
+                    const ok, problem =
+                        pcall(toolkit.generateVersion, { VersionFile = "VERSION", OutputPath = "out.luau" })
+                    expect(ok).to.equal(not missing)
+                    if missing then
+                        expect(problem).to.equal(exited)
+                        expect(table.concat(output)).to.equal("")
+                        expect(table.concat(errors)).to.equal(
+                            `{terminal:Error('VERSION file not found at "VERSION".')}\n`
+                        )
+                    else
+                        expect(table.concat(errors)).to.equal("")
+                        expect(table.concat(output)).to.equal(
+                            `Generated version module with version {terminal:Heading("1.2.3")}.\n`
+                        )
+                    end
+                    const written = table.concat(output) .. table.concat(errors)
+                    expect(
+                        string.find(written, if missing then "38;2;247;118;142" else "38;2;122;162;247", 1, true) ~= nil
+                    ).to.equal(color)
+                end
+            end
+        end)
+
         it("should generate a version module from a VERSION file", function()
             const tempDir = createTempDir()
             writeFile(tempDir, "VERSION", "1.2.3\n")
