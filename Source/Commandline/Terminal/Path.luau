@@ -8,8 +8,11 @@ a slash. Display only, so paths passed to programs must stay unchanged.
 
 --]]
 
+const Text = require("./Text")
 const t = require("@packages/t")
 
+const ELLIPSIS = "..."
+const MAX_PATH_COLUMNS = 40
 const ROBLOX_EXTENSIONS = {
     rbxl = true,
     rbxlx = true,
@@ -81,6 +84,48 @@ function Path.display(path: string, home: string?, directory: boolean?): string
         return "~"
     end
     return display
+end
+
+-- Keeps paths within 40 columns, dropping whole leading folders before shortening the
+-- final component. Only display text changes; directory slashes and Unicode clusters stay.
+function Path.shorten(path: string): string
+    assert(t.string(path))
+
+    const display = Path.slashes(path)
+    if Text.width(display) <= MAX_PATH_COLUMNS then
+        return display
+    end
+    const suffix = if string.sub(display, -1) == "/" then "/" else ""
+    const parts = string.split(string.gsub(display, "/+$", ""), "/")
+    local tail = table.remove(parts) :: string
+    if Text.width(tail) + #ELLIPSIS + 1 + #suffix > MAX_PATH_COLUMNS then
+        const tokens = Text.tokens(tail)
+        local width = 0
+        local first = #tokens + 1
+        for index = #tokens, 1, -1 do
+            const token = tokens[index]
+            width += token.Width
+            if width > MAX_PATH_COLUMNS - #ELLIPSIS - #suffix then
+                break
+            end
+            if token.Width > 0 then
+                first = index
+            end
+        end
+        const ending = {}
+        for index = first, #tokens do
+            table.insert(ending, tokens[index].Text)
+        end
+        return `{ELLIPSIS}{table.concat(ending)}{suffix}`
+    end
+    for index = #parts, 1, -1 do
+        const candidate = `{parts[index]}/{tail}`
+        if Text.width(candidate) + #ELLIPSIS + 1 + #suffix > MAX_PATH_COLUMNS then
+            break
+        end
+        tail = candidate
+    end
+    return `{ELLIPSIS}/{tail}{suffix}`
 end
 
 -- Returns true for place and model files, which display in the Roblox path style.
