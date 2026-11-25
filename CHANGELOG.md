@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.12
+
+- Collapsed long terminal filesystem paths to 40 columns by dropping leading folders.
+- Preserved filename endings, directory slashes, Unicode clusters, and path styling.
+- Left operational paths and Roblox instance paths unchanged.
+
 ## 0.2.11
 
 - Applied a shared explicit RGB palette to built-in help, diagnostics, and progress output.
