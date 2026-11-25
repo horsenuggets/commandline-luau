@@ -289,6 +289,54 @@ return function()
     end)
 
     describe("Terminal prompts", function()
+        it("should accept every named theme foreground at the real native parser", function()
+            -- Native palette validation precedes the required confirm message. This
+            -- sentinel exercises real color parsing without opening an input prompt.
+            const invalidOk, invalidProblem = pcall((stdio :: any).prompt, "confirm", nil, true, {
+                Accent = "unknown",
+                Color = false,
+                Error = "",
+                Muted = "",
+                Success = "",
+                Text = "",
+                Warning = ""
+            })
+            expect(invalidOk).to.equal(false)
+            expect(string.find(tostring(invalidProblem), 'Prompt color field "Accent"', 1, true)).to.be.ok()
+            for _, role in { "Error", "HelpArgument", "Muted", "RobloxPath", "Success", "Warning" } do
+                for _, name in
+                    {
+                        "black",
+                        "blackBright",
+                        "blue",
+                        "blueBright",
+                        "cyan",
+                        "cyanBright",
+                        "gray",
+                        "green",
+                        "greenBright",
+                        "magenta",
+                        "magentaBright",
+                        "red",
+                        "redBright",
+                        "white",
+                        "whiteBright",
+                        "yellow",
+                        "yellowBright"
+                    }
+                do
+                    for _, color in { false, true } do
+                        const terminal = harness({ Color = color, Theme = { [role] = { Color = name } } }).Terminal
+                        const ok, problem = pcall(function()
+                            terminal:Prompt("confirm", nil, true)
+                        end)
+                        expect(ok).to.equal(false)
+                        expect(string.find(tostring(problem), "Argument #2 missing or nil", 1, true)).to.be.ok()
+                    end
+                end
+            end
+        end)
+
         it("should pass each prompt kind, its default, and the current RGB theme to the native boundary", function()
             const cases: { [string]: { Default: Terminal.PromptDefault?, Result: Terminal.PromptResult } } = {
                 confirm = { Default = true, Result = false },
