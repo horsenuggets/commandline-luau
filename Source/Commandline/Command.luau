@@ -489,6 +489,7 @@ function Command._parseArgsAndFlags(
     return positionalArgs, parsedFlags, nil
 end
 
+-- Returns false for usage errors after printing help, otherwise the implementation's result.
 function Command.Execute(self: Command, tokens: { string }): any
     assert(ITokens(tokens), "Invalid tokens provided.")
 
@@ -521,7 +522,7 @@ function Command.Execute(self: Command, tokens: { string }): any
     if err then
         self:_printError(err)
         self:ShowHelp()
-        return
+        return false
     end
 
     -- Check for help Flag
@@ -544,7 +545,7 @@ function Command.Execute(self: Command, tokens: { string }): any
         else
             self:_printError(`Unknown subcommand {Terminal.default():Paint("Emphasis", positionalArgs[1])}.`)
             self:ShowHelp()
-            return
+            return false
         end
     end
 
@@ -554,7 +555,7 @@ function Command.Execute(self: Command, tokens: { string }): any
     if not parsedArgs then
         self:_printError(err)
         self:ShowHelp()
-        return
+        return false
     end
 
     -- Execute the implementation
