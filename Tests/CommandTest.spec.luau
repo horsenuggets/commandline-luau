@@ -33,7 +33,7 @@ const function executeWithOutput(
     tokens: { string },
     config: Terminal.Config?,
     afterExecute: ((Command.Command) -> ())?
-): (string, string, string)
+): (string, string, string, any)
     assert(t.callback(makeCommand))
     assert(t.array(t.string)(tokens))
     assert(t.optional(t.table)(config))
@@ -55,15 +55,16 @@ const function executeWithOutput(
     const previous = Terminal.default()
     const command = makeCommand(Command)
     Terminal.setDefault(Terminal.new(options))
+    local result = nil
     const ok, problem = pcall(function()
-        command:Execute(tokens)
+        result = command:Execute(tokens)
         if afterExecute then
             afterExecute(command)
         end
     end)
     Terminal.setDefault(previous)
     assert(ok, tostring(problem))
-    return table.concat(combined), table.concat(output), table.concat(errors)
+    return table.concat(combined), table.concat(output), table.concat(errors), result
 end
 
 return function()
@@ -605,6 +606,28 @@ return function()
             expect(executed).to.equal(false)
         end)
 
+        it("should preserve successful implementation results without marking help as failure", function()
+            for _, tokens in { {}, { "--help" }, { "--version" }, { "open", "--help" }, { "open", "place" } } do
+                const _, _, stderr, result = executeWithOutput(function(command)
+                    return command.new({
+                        Name = "app",
+                        Version = "1.2.3",
+                        Subcommands = {
+                            command.new({
+                                Name = "open",
+                                Args = { Arg.new({ Name = "place" }) },
+                                Impl = function()
+                                    return "completed"
+                                end
+                            })
+                        }
+                    })
+                end, tokens, { Color = false })
+                expect(result).to.equal(if tokens[2] == "place" then "completed" else nil)
+                expect(stderr).to.equal("")
+            end
+        end)
+
         it("should throw error for invalid tokens", function()
             expect(function()
                 Command.new({
@@ -853,7 +876,7 @@ return function()
                 { Message = "Unknown subcommand unknown.", Tokens = { "unknown" } }
             }
             for _, case in cases do
-                const output, stdout, stderr = executeWithOutput(function(command)
+                const output, stdout, stderr, result = executeWithOutput(function(command)
                     return command.new({
                         Name = "app",
                         Description = "Manage places.",
@@ -868,6 +891,7 @@ return function()
                     })
                 end, case.Tokens)
                 const lines = string.split(Style.strip(output), "\n")
+                expect(result).to.equal(false)
                 expect(Style.strip(stderr)).to.equal(`{case.Message}\n\n`)
                 expect(output).to.equal(`{stderr}{stdout}`)
                 expect(lines[1]).to.equal(case.Message)

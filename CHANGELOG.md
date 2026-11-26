@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.14
+
+- Returned `false` after usage errors so callers can set a failing process exit status.
+- Preserved implementation results and successful help and version responses.
+
 ## 0.2.13
 
 - Printed usage errors without timestamps, matching the untimestamped help that follows.
