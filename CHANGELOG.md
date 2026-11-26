@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.13
+
+- Printed usage errors without timestamps, matching the untimestamped help that follows.
+- Kept configured timestamps for application diagnostics and subsequent output.
+
 ## 0.2.12
 
 - Collapsed long terminal filesystem paths to 40 columns by dropping leading folders.

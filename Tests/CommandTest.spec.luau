@@ -780,11 +780,11 @@ return function()
                     if case.Tokens[2] == "open" then "O" elseif case.Nested then "M" else "a"
                 )
                 expect(later).to.equal("[00:00.000] 1.2.3\n[00:00.000] Ready.\n")
-                for _, line in string.split(Style.strip(stderr), "\n") do
-                    if line ~= "" then
-                        expect(string.sub(line, 1, 12)).to.equal("[00:00.000] ")
-                    end
-                end
+                -- Usage errors stay untimestamped, but later application diagnostics do not.
+                const usage, diagnostic =
+                    string.match(Style.strip(stderr), "^(.-)(%[00:00%.000%] Later diagnostic%.\n)$")
+                assert(usage and diagnostic)
+                expect(string.find(usage, "[00:00.000]", 1, true)).to.equal(nil)
             end
         end)
 
@@ -805,19 +805,31 @@ return function()
             end
         end)
 
-        it("should timestamp diagnostics on stderr and keep the separating blank line blank", function()
-            const output, stdout, stderr = executeWithOutput(function(command)
-                return command.new({ Name = "app", Description = "Manage places." })
-            end, { "--unknown" }, {
-                Clock = CLOCK,
-                Color = false,
-                Timestamps = "stopwatch"
-            })
-            expect(Style.strip(stderr)).to.equal("[00:00.000] Unknown flag --unknown.\n\n")
-            expect(Style.strip(stdout):sub(1, 4)).to.equal("app\n")
-            expect(string.find(stdout, "[00:00.000]", 1, true)).to.equal(nil)
-            expect(output).to.equal(`{stderr}{stdout}`)
-            expect(stderr).to.equal("[00:00.000] Unknown flag --unknown.\n\n")
+        it("should keep usage errors on stderr untimestamped like the help they precede", function()
+            for _, tokens in { { "--unknown" }, { "unknown" } } do
+                const output, stdout, stderr = executeWithOutput(
+                    function(command)
+                        return command.new({
+                            Name = "app",
+                            Description = "Manage places.",
+                            Subcommands = { command.new({ Name = "open" }) }
+                        })
+                    end,
+                    tokens,
+                    {
+                        Clock = CLOCK,
+                        Color = false,
+                        Timestamps = "stopwatch"
+                    }
+                )
+                const message = if tokens[1] == "unknown"
+                    then "Unknown subcommand unknown."
+                    else "Unknown flag --unknown."
+                expect(stderr).to.equal(`{message}\n\n`)
+                expect(Style.strip(stdout):sub(1, 4)).to.equal("app\n")
+                expect(string.find(output, "[00:00.000]", 1, true)).to.equal(nil)
+                expect(output).to.equal(`{stderr}{stdout}`)
+            end
         end)
 
         it("should print unlabelled red errors followed by one blank line before help", function()

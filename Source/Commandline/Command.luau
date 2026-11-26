@@ -330,7 +330,8 @@ end
 
 function Command._printError(self: Command, message: string)
     const terminal = Terminal.default()
-    terminal:PrintError(`{terminal:Error(message)}\n`)
+    -- Usage errors lead into untimestamped help, so they stay untimestamped too.
+    terminal:PrintError(`{terminal:Error(message)}\n`, { Timestamps = false })
 end
 
 function Command._findFlagByName(self: Command, name: string): Flag.Flag?
